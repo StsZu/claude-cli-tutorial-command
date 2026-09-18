@@ -59,7 +59,7 @@ window.CLI_COURSE.modules.push({
       ]
     },
     {
-      id: "m05-l02", title: "Налаштування і інтерфейс", minutes: 9,
+      id: "m05-l02", title: "Налаштування й інтерфейс", minutes: 9,
       steps: [
         { type: "concept", title: "Один центр налаштувань",
           body: "<p>Більшість налаштувань — модель, тема, стиль виводу, режим редактора — зібрані в <code>/config</code> (аліас <code>/settings</code>). Окремі команди — для того, що налаштовують частіше: <code>/theme</code>, <code>/statusline</code>, <code>/keybindings</code>, <code>/terminal-setup</code>.</p><p>Налаштування зберігаються у файлах <code>settings.json</code>: особистий <code>~/.claude/settings.json</code> і проєктний <code>.claude/settings.json</code>.</p>",

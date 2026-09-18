@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate index.html trainer from claude_code_slash_commands_uk.md."""
+"""ARCHIVE: колись генерував index.html (старий тренажер) з claude_code_slash_commands_uk.md.
+
+Тренажер тепер — courses/claude-code/trainer.html (window.TRAINER) і редагується напряму; index.html —
+оболонка курсу, яку генерує scripts/render-index.mjs у hub. Запуск цього скрипта перезаписав би оболонку
+застарілим тренажером, тому він нічого не пише.
+"""
 import json
 import re
 from pathlib import Path
@@ -758,4 +763,4 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit("build_index.py — архів: тренажер тепер у trainer.html, index.html генерує scripts/render-index.mjs (див. docstring).")

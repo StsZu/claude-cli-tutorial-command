@@ -10,6 +10,7 @@ window.CLI_COURSE_CONFIG = {
   termTitle: "claude — ~/Projects/demo",
   sandbox: "trainer.html",
   quizBank: null,
+  factsCheckedAt: "2026-09-18",
   skills: [
     ["terminal", "Запускати `claude` у папці проєкту, користуватися меню `/`, `/help` і `CLAUDE.md`."],
     ["shield", "Обирати режим дозволів (`Shift+Tab`, `--permission-mode`) і розуміти ризик `--dangerously-skip-permissions`."],
@@ -19,7 +20,7 @@ window.CLI_COURSE_CONFIG = {
     ["hub", "Підключати MCP, skills і фонові агенти: `/mcp`, `/skills`, `/background`, `/tasks`."]
   ],
   audience: "<p>Для тих, хто вже запускав <code>claude</code> у терміналі (або збирається) і хоче працювати з агентом свідомо: знати потрібні slash-команди, контролювати, що агент може робити без дозволу, і вміти перевірити та відкотити його зміни.</p><p>Головна мета — не вивчити всі команди, а навчитися швидко знаходити потрібну команду, розуміти її ризик і застосовувати її в реальному сценарії.</p>",
-  safety: "<p>Кроки «Спробуй сам» і тренажер — імітація: вони нічого не запускають і не звертаються до API. У справжньому Claude Code агент змінює файли і виконує команди на твоєму комп'ютері: працюй у папці проєкту з чистим <code>git status</code>, не вмикай <code>--dangerously-skip-permissions</code> поза контейнером чи VM. Набір команд залежить від версії, плану й платформи — звіряйся з <code>/help</code> своєї версії.</p>",
+  safety: "<p>Кроки «Спробуй сам» і тренажер — імітація: вони нічого не запускають і не звертаються до API. У справжньому Claude Code агент змінює файли і виконує команди на твоєму комп'ютері: працюй у папці проєкту з чистим <code>git status</code>. Зверни увагу на стартовий режим дозволів: у новіших версіях на планах Pro, Max і Team сесія починається в <code>auto</code> (дії перевіряє класифікатор, а не ти), тож якщо хочеш підтверджувати кожну зміну — запускай <code>claude --permission-mode default</code>. Не вмикай <code>--dangerously-skip-permissions</code> поза контейнером чи VM. Набір команд залежить від версії, плану й платформи — звіряйся з <code>/help</code> своєї версії.</p>",
   sources: [
     { href: "https://code.claude.com/docs/en/commands", label: "Claude Code — Commands (довідник slash-команд)" },
     { href: "https://code.claude.com/docs/en/permission-modes", label: "Claude Code — Permission modes" },

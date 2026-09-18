@@ -187,6 +187,9 @@
       ["/status", "Версія, модель, акаунт і стан з'єднання"],
       ["/doctor", "Діагностика встановлення й налаштувань"],
       ["claude -c", "Продовжити останню розмову в цій папці"],
+      ["claude -r \"auth-refactor\"", "Відновити сесію за назвою"],
+      ["claude -p \"explain this project\"", "Одноразовий запит без інтерактивної сесії"],
+      ["claude --model opus", "Запустити сесію з моделлю opus"],
       ["/exit", "Завершити сесію"]
     ] },
     { id: "safety", title: "Безпека і дозволи", intro: "Режими дозволів, правила allow/ask/deny, пісочниця, небезпечний прапорець.", commands: [
@@ -208,7 +211,7 @@
       ["/resume", "Повернутися до попередньої сесії"],
       ["/rename", "Перейменувати поточну сесію"],
       ["/branch", "Відгалуження розмови для альтернативного підходу"],
-      ["/rewind", "Відкотити код і/або розмову до чекпоінту"],
+      ["/rewind", "Відкотити код і/або розмову до чекпоінту", "high"],
       ["/export", "Експортувати розмову як текст"],
       ["/copy", "Скопіювати останню відповідь у буфер"]
     ] },
@@ -244,6 +247,7 @@
     ] },
     { id: "ext", title: "MCP, skills, розширення", intro: "mcp, skills, agents, hooks, plugins, інтеграції.", commands: [
       ["/mcp", "Стан MCP-серверів і вхід через OAuth"],
+      ["claude mcp list", "Список MCP-серверів і їхній стан (з терміналу)"],
       ["/mcp reconnect github", "Перепідключити MCP-сервер github"],
       ["/skills", "Список доступних skills"],
       ["/reload-skills", "Підхопити нові чи змінені skills без перезапуску"],
@@ -261,6 +265,7 @@
     ] },
     { id: "agents", title: "Фон і хмара", intro: "background, fork, tasks, batch, loop, schedule, teleport.", commands: [
       ["/background", "Від'єднати сесію у фон і звільнити термінал"],
+      ["claude agents", "Agent view: фонові сесії (з терміналу)"],
       ["/fork", "Скопіювати розмову в нову фонову сесію"],
       ["/tasks", "Фонова робота поточної сесії"],
       ["/stop", "Зупинити фонову сесію, до якої ти підключений"],
@@ -307,6 +312,8 @@
   // Офіційні аліаси й еквівалентні форми: пункт чекліста → варіанти, що теж зараховуються.
   const ALIASES = {
     "claude -c": ["claude --continue"],
+    "claude -r \"auth-refactor\"": ["claude --resume \"auth-refactor\"", "claude -r auth-refactor", "claude --resume auth-refactor"],
+    "claude -p \"explain this project\"": ["claude --print \"explain this project\""],
     "claude --permission-mode plan": ["claude --permission-mode=plan"],
     "claude --permission-mode acceptEdits": ["claude --permission-mode=acceptEdits"],
     "claude --dangerously-skip-permissions": ["claude --permission-mode bypassPermissions", "claude --permission-mode=bypassPermissions"],
@@ -440,6 +447,19 @@
   function hl(s) { return `<span class="line-hl">${esc(s)}</span>`; }
   function lines() { return Array.prototype.slice.call(arguments).join("\n"); }
 
+  function err(s) { return `<span class="line-err">${esc(s)}</span>`; }
+  // Тіло з позначкою помилки: емулятор відповів в стилі інструменту, але значення не існує.
+  function fail(body) { return { fail: true, body: body }; }
+  const MODEL_ALIASES = ["default", "best", "fable", "sonnet", "opus", "haiku", "sonnet[1m]", "opus[1m]", "opusplan", "opusplan[1m]"];
+  const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode", "auto"];
+  function isValidModel(m) { return MODEL_ALIASES.includes(m) || /^claude-(opus|sonnet|haiku|fable)-[a-z0-9.\-]+(\[1m\])?$/.test(m); }
+  function isPlaceholder(a) { return /^(?:[<\[][^<>\[\]]*[>\]]\s*)+$/.test(a); }
+  // MCP-промпти підключених (емульованих) серверів: /mcp__сервер__промпт, у меню — /сервер:промпт (MCP).
+  const MCP_PROMPTS = {
+    github: { list_prs: () => lines("  #128  fix: token refresh race     open", "  #127  feat: rate limiting          review requested"), pr_review: (a) => mu(`Reviewing PR ${a || "(номер PR — аргумент)"}…`) },
+    jira: { summarize_ticket: (a) => mu(`Summary of ${a || "ticket"}: login fails after token expiry`), create_issue: (a) => ok(`✓ Created issue ${a ? "(" + a + ")" : ""}`) }
+  };
+
   const OUT = {
     "/help": () => lines(hl("Claude Code — help"), mu("Type / to see available commands. Розділ тренажера: " + getModule().title),
       ...getCurrentCommands().filter(c => c.startsWith("/")).map(c => `  <span class="line-cmd">${esc(c.padEnd(28))}</span>${mu(HINTS[c] || "")}`)),
@@ -459,7 +479,8 @@
     "/resume": () => lines(hl("Resume session"), "  › auth-refactor        yesterday · 42 msgs", "    landing-page         3 days ago", mu("Enter — відкрити")),
     "/rename": (arg) => ok(`✓ Session renamed: ${arg || "fix-login-validation (auto)"}`),
     "/branch": () => lines(ok("✓ Branched conversation"), mu("Оригінал — у /resume")),
-    "/rewind": () => lines(hl("Rewind to:"), "  › \"fix the login bug\"   2 files changed", "    \"add tests\"", mu("Restore code and conversation / conversation / code"), mu("Зміни від команд оболонки (rm, mv) не відстежуються — для них Git.")),
+    "/rewind": () => lines(hl("Rewind to:"), "  › \"fix the login bug\"   2 files changed", "    \"add tests\"", mu("Restore code and conversation / Restore conversation / Restore code / Summarize from here / Summarize up to here / Never mind"),
+      `<span class="line-warn">Restore code перезапише пізніші правки у відстежених файлах. Спершу git diff і git stash або коміт.</span>`, mu("Зміни від команд оболонки (rm, mv) і більшості субагентів не відстежуються — для них Git.")),
     "/export": (arg) => ok(arg ? `✓ Exported to ${arg}` : "Export: › Copy to clipboard   Save to file"),
     "/copy": () => ok("✓ Copied last response to clipboard"),
     "/diff": () => lines(" src/auth.js      | 12 ++++++----", " tests/auth.test  |  8 ++++++++", mu(" 2 files changed")),
@@ -472,8 +493,21 @@
     "/simplify": () => lines(mu("Running 4 review agents…"), ok("✓ Removed duplicated helper in utils/date.js")),
     "/verify": () => lines(mu("Building… running app… opening /login"), ok("✓ Login form submits and redirects to /dashboard")),
     "/run": () => lines(mu("Starting dev server on :3000…"), ok("✓ App running")),
-    "/model": (arg) => { if (arg) { state.model = arg; return ok(`✓ Set model to ${arg}`); } return lines(hl("Select model"), `  › ${esc(state.model)} (current)`, "    opus", "    haiku", "    fable (якщо доступна)", mu("Аліаси вказують на актуальні версії; s — лише для цієї сесії.")); },
-    "/effort": (arg) => { if (arg) { state.effort = arg; return ok(`✓ Effort level set to ${arg}`); } return lines(hl(`Effort: ${state.effort}`), mu("low · medium · high · xhigh · max · auto (залежить від моделі)")); },
+    "/model": (arg) => {
+      if (arg) {
+        if (!isValidModel(arg)) return fail(lines(err(`✗ Unknown model: ${arg}`), mu("Аліаси: " + MODEL_ALIASES.join(", ") + " або повна назва моделі Claude (напр. claude-sonnet-5).")));
+        state.model = arg; return ok(`✓ Set model to ${arg}`);
+      }
+      return lines(hl("Select model"), `  › ${esc(state.model)} (current)`, "    default", "    opus", "    haiku", "    fable (якщо доступна)", "    opusplan", mu("Аліаси вказують на актуальні версії; s — лише для цієї сесії."));
+    },
+    "/effort": (arg) => {
+      if (arg === "status") return ok(`Effort: ${state.effort}`);
+      if (arg) {
+        if (!EFFORT_LEVELS.includes(arg)) return fail(lines(err(`✗ Invalid effort level: ${arg}`), mu("Рівні: " + EFFORT_LEVELS.join(" · ") + " (не всі моделі підтримують усі рівні)")));
+        state.effort = arg; return ok(`✓ Effort level set to ${arg}`);
+      }
+      return lines(hl(`Effort: ${state.effort}`), mu(EFFORT_LEVELS.join(" · ") + " (залежить від моделі)"));
+    },
     "/usage": () => lines(hl("Usage"), "  Session       $0.42 (емуляція)", "  Plan limit    37% used · resets in 3h", mu("  Tabs: Usage · Stats")),
     "/config": () => lines(hl("Settings"), "  Status  Config  Usage", "  › Editor mode   normal", "    Theme         auto", "    Model         " + esc(state.model)),
     "/mcp": (arg) => {
@@ -488,73 +522,203 @@
     "/stop": () => mu("Лише в підключеній фоновій сесії: зупиняє її, історія й worktree лишаються.")
   };
 
+  /* Кожна emulate* повертає статус: "ok" — зараховується, "info" — змістовна відповідь без зарахування,
+     "error" — помилка в стилі інструменту (неіснуюче значення), "unknown" — не емулюється. */
   function emulateSlash(cmd) {
     const base = cmd.split(" ")[0];
     const arg = base === "/ultrareview" ? ("ultra " + cmd.slice(base.length)).trim() : cmd.slice(base.length).trim();
     if (REMOVED[base]) {
       printResult(`${base} — видалена команда`, mu(REMOVED[base]), "warn");
-      return false;
+      return "info";
+    }
+    const mcp = base.match(/^\/mcp__(.+?)__(.+)$/);
+    if (mcp) {
+      if (isPlaceholder(mcp[1]) || isPlaceholder(mcp[2])) {
+        printResult("Промпт MCP-сервера", lines(mu("Форма: /mcp__<сервер>__<промпт> [аргументи]. У меню / такі промпти видно як /<сервер>:<промпт> (MCP)."), mu("Приклад: /mcp__github__list_prs")), "purple");
+        return "info";
+      }
+      const fn = (MCP_PROMPTS[mcp[1]] || {})[mcp[2]];
+      if (!fn) { printResult("Unknown command", err(`✗ Unknown command: ${base}`) + "\n" + mu("Сервер не підключений або не експортує такий промпт. Перевір /mcp і меню /."), "warn"); return "error"; }
+      printResult(`${cmd}`, lines(mu(`/${mcp[1]}:${mcp[2]} (MCP)`), fn(arg)), "ok", "Промпт, який експортує MCP-сервер " + mcp[1]);
+      return "ok";
     }
     if (!KNOWN_SLASH.has(base)) {
       printResult("Невідома команда", mu(`«${cmd}» — такої команди немає в тренажері. Набери / або /help, щоб побачити список розділу.`), "warn");
-      return false;
+      return "unknown";
     }
     const target = ALIAS_BASE[base] || base;
     const listedExact = allCommands().find(c => matches(cmd, c));
     const hint = HINTS[listedExact] || HINTS[target] || "";
+    if (arg && isPlaceholder(arg)) {
+      printResult(`${target} — синтаксис`, lines(mu(`${cmd}: у дужках — місце для значення. <…> — обов'язкове, […] — необов'язкове.`), mu(`Підстав своє значення, наприклад: ${allCommands().find(c => c.startsWith(target + " ")) || target}`)), "purple", HINTS[target] || "");
+      return "info";
+    }
     const fn = OUT[target];
-    const body = fn ? fn(arg) : lines(ok("✓ " + (HINTS[target] || target)), mu("Емуляція: реальний вивід залежить від версії Claude Code."));
+    const res = fn ? fn(arg) : lines(ok("✓ " + (HINTS[target] || target)), mu("Емуляція: реальний вивід залежить від версії Claude Code."));
+    if (res && res.fail) { printResult(cmd, res.body, "warn", hint); return "error"; }
     const aliasNote = target !== base ? `\n${mu(base + " — аліас " + target)}` : "";
-    printResult(cmd, body + aliasNote, "ok", hint);
-    return true;
+    printResult(cmd, res + aliasNote, "ok", hint);
+    return "ok";
+  }
+
+  // Розбір аргументів командного рядка з урахуванням лапок.
+  function tokenize(str) {
+    const out = []; const re = /"([^"]*)"|'([^']*)'|(\S+)/g; let m;
+    while ((m = re.exec(str))) out.push(m[1] != null ? m[1] : m[2] != null ? m[2] : m[3]);
+    return out;
+  }
+  function cliError(cmd, msg) { printResult(cmd, err(msg), "warn", "Перевір написання: claude --help покаже всі прапорці."); return "error"; }
+
+  function emulateClaudeMcp(cmd, args) {
+    const sub = args[0];
+    if (sub === "list") {
+      printResult(cmd, lines(mu("Checking MCP server health…"), "", "filesystem: npx -y @modelcontextprotocol/server-filesystem . - " + ok("✔ Connected"), "github: https://api.githubcopilot.com/mcp/ (HTTP) - " + err("✘ Failed to connect")), "ok", HINTS["claude mcp list"]);
+      return "ok";
+    }
+    if (sub === "add") {
+      const rest = args.slice(1); let transport = "stdio"; const pos = [];
+      for (let i = 0; i < rest.length; i++) {
+        if (rest[i] === "--transport" || rest[i] === "-t") { transport = rest[++i]; continue; }
+        if (/^--transport=/.test(rest[i])) { transport = rest[i].split("=")[1]; continue; }
+        if (/^--(scope|header)$/.test(rest[i]) || /^-[sH]$/.test(rest[i])) { i++; continue; }
+        pos.push(rest[i]);
+      }
+      if (!["stdio", "http", "sse"].includes(transport)) return cliError(cmd, `error: Invalid transport type: ${transport}. Must be one of: stdio, sse, http`);
+      if (pos.length < 2) return cliError(cmd, "error: missing required argument — claude mcp add [--transport http] <name> <url>");
+      if (pos.some(isPlaceholder)) {
+        printResult(cmd, lines(mu("Синтаксис: claude mcp add --transport http <name> <url>"), mu("Приклад: claude mcp add --transport http notion https://mcp.notion.com/mcp")), "purple", "Підключити віддалений MCP-сервер");
+        return "info";
+      }
+      printResult(cmd, lines(ok(`Added ${transport.toUpperCase()} MCP server ${pos[0]} with URL: ${pos[1]} to local config`), mu("Перевір стан: /mcp або claude mcp list. Підключай лише сервери, яким довіряєш.")), "ok", "Підключити MCP-сервер");
+      return "ok";
+    }
+    if ((sub === "get" || sub === "remove") && args[1]) {
+      printResult(cmd, sub === "get" ? lines(hl(args[1] + ":"), "  Scope: Local config", "  Status: " + ok("✔ Connected")) : ok(`Removed MCP server ${args[1]} from local config`), "ok");
+      return "ok";
+    }
+    return cliError(cmd, `error: unknown command '${sub || ""}'. Команди: claude mcp list | add | get | remove`);
   }
 
   function emulateClaude(cmd) {
-    const flags = cmd.replace(/^claude\s*/, "");
-    const pm = flags.match(/^--permission-mode(?:=|\s+)(\S+)$/);
-    if (flags === "") {
-      printResult("claude", lines(ok("Claude Code — нова сесія в ~/Projects/demo"), mu(MODE_LABEL[state.mode] + " (shift+tab to cycle)")), "ok", HINTS.claude);
-      return true;
+    const args = tokenize(cmd).slice(1);
+    if (args[0] === "mcp") return emulateClaudeMcp(cmd, args.slice(1));
+    if (args[0] === "agents") {
+      printResult(cmd, lines(hl("Agent view"), "  ● auth-refactor       working   2m   ~/Projects/demo", "  ✓ migrate-tests       done      1h", mu("Enter — підключитися · n — нова фонова сесія")), "ok", HINTS["claude agents"]);
+      return "ok";
     }
-    if (flags === "-c" || flags === "--continue") {
-      printResult(cmd, ok("Resuming conversation \"auth-refactor\" (yesterday, 42 messages)"), "ok", HINTS["claude -c"]);
-      return true;
+    const opt = { mode: null, model: null, cont: false, resume: null, print: null, prompt: null, danger: false };
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      const kv = a.match(/^(--[a-z-]+)=(.*)$/);
+      const flag = kv ? kv[1] : a, val = () => (kv ? kv[2] : args[++i]);
+      if (flag === "-c" || flag === "--continue") opt.cont = true;
+      else if (flag === "-r" || flag === "--resume") opt.resume = (args[i + 1] && !args[i + 1].startsWith("-")) || kv ? val() : "";
+      else if (flag === "-p" || flag === "--print") opt.print = (args[i + 1] && !args[i + 1].startsWith("-")) || kv ? val() : "";
+      else if (flag === "--model") { opt.model = val(); if (!opt.model) return cliError(cmd, "error: option '--model <model>' argument missing"); }
+      else if (flag === "--permission-mode") { opt.mode = val(); if (!opt.mode) return cliError(cmd, "error: option '--permission-mode <mode>' argument missing"); }
+      else if (flag === "--dangerously-skip-permissions") opt.danger = true;
+      else if (a.startsWith("-")) return cliError(cmd, `error: unknown option '${a}'`);
+      else if (opt.prompt == null) opt.prompt = a;
+      else return cliError(cmd, `error: too many arguments. Візьми промпт у лапки.`);
     }
-    if (flags === "--dangerously-skip-permissions" || (pm && pm[1] === "bypassPermissions")) {
-      state.mode = "bypassPermissions";
+    if (opt.model && !isValidModel(opt.model)) return cliError(cmd, `✗ Unknown model: ${opt.model}. Аліаси: ${MODEL_ALIASES.join(", ")} або повна назва моделі Claude.`);
+    let mode = null;
+    if (opt.mode) {
+      mode = opt.mode === "manual" ? "default" : opt.mode;
+      if (!MODE_LABEL[mode]) return cliError(cmd, `error: option '--permission-mode <mode>' argument '${opt.mode}' is invalid. Allowed choices are default (manual), acceptEdits, plan, auto, dontAsk, bypassPermissions.`);
+    }
+    if (opt.danger) mode = "bypassPermissions";
+    if (mode) state.mode = mode;
+    if (opt.model) state.model = opt.model;
+    const listed = allCommands().find(c => matches(cmd, c));
+    const hint = HINTS[listed] || "";
+    if (mode === "bypassPermissions") {
       printResult("⚠ bypassPermissions — без запитів і перевірок", lines(
         `<span class="line-err">${esc(MODE_LABEL.bypassPermissions)}</span>`,
         "Агент виконає rm -rf, git push --force, зміни конфігів одразу, без питань.",
         "Зміни від команд оболонки /rewind не відкотить. Під root/sudo Claude Code відмовиться стартувати.",
         ok("Безпечніше: acceptEdits або auto для роботи, dontAsk з allowlist для скриптів."),
         ok("Повна автономія — лише в контейнері, VM чи dev container без твоїх ключів і даних.")), "danger", HINTS["claude --dangerously-skip-permissions"]);
-      return true;
+      return "ok";
     }
-    if (pm) {
-      const mode = pm[1] === "manual" ? "default" : pm[1];
-      if (!MODE_LABEL[mode]) { printResult("Невідомий режим", mu(`«${pm[1]}». Доступні: default (manual), acceptEdits, plan, auto, dontAsk, bypassPermissions.`), "warn"); return false; }
-      state.mode = mode;
-      printResult(cmd, lines(ok(MODE_LABEL[mode]), mu("(shift+tab to cycle)")), "ok", HINTS[cmd] || "");
-      return true;
+    if (opt.print != null) {
+      const q = opt.print || opt.prompt;
+      if (!q) return cliError(cmd, "Error: Input must be provided either through stdin or as a prompt argument when using --print");
+      printResult(cmd, lines(mu(`(неінтерактивно, стартовий режим — default) запит: ${q}`), "Це Node.js API для входу користувачів: src/auth.js — логіка, tests/ — Jest.", mu("Відповідь моделі тут вигадана; claude -p друкує відповідь і завершується.")), "ok", hint);
+      return "ok";
     }
-    printResult("Невідомий запуск", mu(`«${cmd}» не емулюється. Спробуй claude, claude -c або claude --permission-mode plan.`), "warn");
-    return false;
+    const extra = [];
+    if (opt.model) extra.push(mu(`model: ${opt.model}`));
+    if (opt.prompt) extra.push(mu(`початковий промпт: ${opt.prompt}`));
+    if (opt.cont) { printResult(cmd, lines(ok("Resuming conversation \"auth-refactor\" (yesterday, 42 messages)"), ...extra), "ok", hint || HINTS["claude -c"]); return "ok"; }
+    if (opt.resume != null) {
+      const body = opt.resume ? ok(`Resuming session "${opt.resume}" (yesterday, 42 messages)`) : lines(hl("Resume session"), "  › auth-refactor        yesterday · 42 msgs", "    landing-page         3 days ago");
+      printResult(cmd, lines(body, ...extra), "ok", hint); return "ok";
+    }
+    printResult(cmd, lines(ok("Claude Code — нова сесія в ~/Projects/demo"), mu(MODE_LABEL[state.mode] + " (shift+tab to cycle)"), ...extra,
+      mode ? "" : mu("Тренажер стартує в Manual. Справжній Claude Code на Pro/Max/Team (v2.1.228+) стартує в auto, якщо ти не задав --permission-mode чи defaultMode.")), "ok", hint || HINTS.claude);
+    return "ok";
+  }
+
+  // Оболонка до запуску claude: лише перехід у папку проєкту.
+  const SHELL_DIRS = { "~/Projects/demo": 1, "~/Projects/demo/": 1, "Projects/demo": 1, "Projects/demo/": 1, "~": 1, "~/Projects": 1, "..": 1, ".": 1 };
+  function emulateCd(cmd) {
+    const dir = cmd.replace(/^cd\s*/, "") || "~";
+    if (!SHELL_DIRS[dir]) { printResult(cmd, err(`cd: no such file or directory: ${dir}`), "warn"); return "error"; }
+    printResult(cmd, lines(mu("Stas@MacBook-Pro " + (/demo/.test(dir) ? "demo" : "~") + " %"), /demo/.test(dir) ? ok("Ти в папці проєкту — тепер запусти claude.") : mu("Проєкт — у ~/Projects/demo.")), "ok");
+    return "ok";
+  }
+
+  const SHELL_BANG = {
+    "git status": () => lines("On branch main", "Changes not staged for commit:", "  modified:   src/auth.js"),
+    "git diff": () => lines("diff --git a/src/auth.js b/src/auth.js", "-  if (exp < now)", "+  if (Number(exp) < now)"),
+    "ls": () => "CLAUDE.md  package.json  src  tests",
+    "pwd": () => "/Users/stas/Projects/demo",
+    "npm test": () => lines("PASS tests/auth.test.js", "Tests: 8 passed, 8 total")
+  };
+  function emulateBang(cmd) {
+    const sh = cmd.slice(1).trim();
+    if (isPlaceholder(sh)) {
+      printResult("Режим оболонки (!)", lines(mu("!<команда> — рядок з ! на початку виконується в оболонці без моделі, вивід додається в розмову."), mu("Спробуй: !git status")), "purple");
+      return "info";
+    }
+    if (/^(sudo\s+)?rm\s+-[a-zA-Z]*[rf]|git\s+(reset\s+--hard|push\s+--force|clean\s+-[a-z]*f)/.test(sh)) {
+      printResult("⚠ Руйнівна команда оболонки", lines(err(`$ ${sh}`), "Через ! команда виконається одразу, без моделі й без запиту дозволу; /rewind її не відкотить.", ok("Спершу git status і git stash або коміт; видаляй точкові шляхи, не цілі папки.")), "danger");
+      return "info";
+    }
+    const fn = SHELL_BANG[sh];
+    if (!fn) {
+      printResult("Режим оболонки (!)", lines(mu(`$ ${sh}`), mu("Цю команду тренажер не емулює. Спробуй !git status, !git diff, !ls або !npm test.")), "purple");
+      return "unknown";
+    }
+    printResult(cmd, lines(mu(`$ ${sh}`), fn(), mu("(вивід додано в розмову)")), "ok", "Режим оболонки: команда без участі моделі");
+    return "info";
   }
 
   function handleCommand(cmd) {
     if (cmd === "/") {
       printResult("Меню команд", OUT["/help"](), "purple", "Набирай літери після /, щоб відфільтрувати список.");
-      return false;
+      return "info";
     }
     if (cmd.startsWith("/")) return emulateSlash(cmd);
     if (/^claude(\s|$)/.test(cmd)) return emulateClaude(cmd);
-    if (cmd.startsWith("!")) {
-      printResult("Режим оболонки (!)", lines(mu(`$ ${cmd.slice(1).trim()}`), mu("Команда виконалась би в оболонці, а вивід потрапив би в розмову. Тренажер оболонку не емулює.")), "purple");
-      return false;
-    }
+    if (/^cd(\s|$)/.test(cmd)) return emulateCd(cmd);
+    if (cmd.startsWith("!")) return emulateBang(cmd);
     printResult("Промпт", lines(ok(`«${cmd}»`), mu("Відповідь моделі не емулюється — тренуй slash-команди і запуск claude.")), "purple");
-    return false;
+    return "unknown";
   }
+
+  // Контракт A (фіча 002): та сама логіка розбору, сухий прогін — стан і вивід відновлюються.
+  function recognizes(raw) {
+    const cmd = normalizeCommand(raw);
+    if (!cmd) return false;
+    const saved = { mode: state.mode, model: state.model, effort: state.effort, claudeMd: state.claudeMd, sandbox: state.sandbox };
+    const savedView = viewChunks;
+    viewChunks = [];
+    try { const r = handleCommand(cmd); return r === "ok" || r === "info"; }
+    finally { Object.assign(state, saved); viewChunks = savedView; }
+  }
+  window.TRAINER.recognizes = recognizes;
 
   function execute(raw) {
     const cmd = normalizeCommand(raw);
@@ -570,7 +734,7 @@
     }
     const res = handleCommand(cmd);
     flushView();
-    if (res !== false && listed) markTried(listed);
+    if (res === "ok" && listed) markTried(listed);
   }
 
   function markTried(listed) {

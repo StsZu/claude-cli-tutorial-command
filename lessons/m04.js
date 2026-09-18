@@ -41,7 +41,7 @@ window.CLI_COURSE.modules.push({
           options: ["`/verify` — зібрати, запустити застосунок і перевірити поведінку", "`/compact`", "`/security-review`"],
           correct: 0, feedback: "`/verify` перевіряє реальну роботу застосунку, а не лише тести й типи." },
         { type: "callout", variant: "tip", title: "Хмарний review",
-          body: "<p><code>/code-review ultra</code> (раніше <code>/ultrareview</code>) запускає глибокий багатоагентний review у хмарі. Кількість безкоштовних запусків обмежена, далі — з кредитами використання; умови залежать від плану.</p>" },
+          body: "<p><code>/code-review ultra</code> (<code>/ultrareview</code> — його аліас, якщо ultrareview доступний твоєму акаунту) запускає глибокий багатоагентний review у хмарі. Кількість безкоштовних запусків обмежена, далі — з кредитами використання; умови залежать від плану.</p>" },
         { type: "check", title: "--fix",
           question: "Чим `/code-review --fix` відрізняється від `/code-review`?",
           options: ["Нічим", "Одразу застосовує виправлення до файлів — після нього знову переглянь `/diff`", "Надсилає код в Anthropic на ручну перевірку"],

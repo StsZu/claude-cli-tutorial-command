@@ -12,7 +12,7 @@ window.CLI_COURSE.cheatsheet = {
       { cmd: "claude mcp add --transport http <name> <url>", desc: "Додати MCP-сервер — лише довірений", risk: "medium" }
     ] },
     { title: "Режими дозволів і безпека", rows: [
-      { cmd: "Shift+Tab", desc: "Перемкнути режим у сесії: `default` → `acceptEdits` → `plan` → …", risk: "low" },
+      { cmd: "Shift+Tab", desc: "Перемкнути режим у сесії: `default` → `acceptEdits` → `plan` → …", risk: "low", outsideTrainer: true },
       { cmd: "claude --permission-mode plan", desc: "Старт у режимі планування: правки після схвалення плану", risk: "low" },
       { cmd: "claude --permission-mode default", desc: "Manual: питати перед кожною зміною (`manual` — аліас)", risk: "medium" },
       { cmd: "claude --permission-mode acceptEdits", desc: "Правки файлів без запиту, інші команди — з запитом", risk: "medium" },
@@ -30,7 +30,7 @@ window.CLI_COURSE.cheatsheet = {
       { cmd: "/init", desc: "Створити чернетку `CLAUDE.md` для проєкту", risk: "medium" },
       { cmd: "/memory", desc: "Редагувати `CLAUDE.md`, керувати auto memory", risk: "medium" },
       { cmd: "/status", desc: "Версія, модель, акаунт, з'єднання", risk: "low" },
-      { cmd: "/doctor", desc: "Діагностика встановлення й налаштувань", risk: "low" },
+      { cmd: "/doctor", desc: "Діагностика й виправлення налаштувань (може змінити CLAUDE.md — після підтвердження)", risk: "medium" },
       { cmd: "/exit", desc: "Вихід (аліас `/quit`, або `Ctrl+D`)", risk: "low" }
     ] },
     { title: "Контекст і сесії", rows: [
@@ -41,7 +41,7 @@ window.CLI_COURSE.cheatsheet = {
       { cmd: "/resume", desc: "Повернутися до сесії (аліас `/continue`)", risk: "low" },
       { cmd: "/rename <назва>", desc: "Назвати сесію", risk: "low" },
       { cmd: "/branch", desc: "Відгалуження розмови для альтернативного підходу", risk: "low" },
-      { cmd: "/rewind", desc: "Відкат коду й/або розмови до чекпоінту; `Esc Esc` (аліаси `/checkpoint`, `/undo`). Не бачить змін від команд оболонки", risk: "medium" },
+      { cmd: "/rewind", desc: "Відкат коду й/або розмови до чекпоінту; `Esc Esc` (аліаси `/checkpoint`, `/undo`). Перезапише пізніші правки у відстежених файлах; не бачить змін від команд оболонки і більшості субагентів. Спершу `git diff` і `git stash`/коміт", risk: "high" },
       { cmd: "/export [файл]", desc: "Експорт розмови як тексту", risk: "low" },
       { cmd: "/copy", desc: "Скопіювати останню відповідь", risk: "low" }
     ] },
@@ -52,7 +52,7 @@ window.CLI_COURSE.cheatsheet = {
       { cmd: "/security-review", desc: "Вразливості в змінах гілки (потрібен `origin`)", risk: "low" },
       { cmd: "/simplify", desc: "Повтори й зайва складність — і виправлення", risk: "medium" },
       { cmd: "/verify", desc: "Зібрати, запустити застосунок і перевірити зміну", risk: "medium" },
-      { cmd: "/run", desc: "Запустити і «поводити» застосунок", risk: "medium" }
+      { cmd: "/run", desc: "Запустити застосунок і керувати ним", risk: "medium" }
     ] },
     { title: "Модель і налаштування", rows: [
       { cmd: "/model [аліас]", desc: "Змінити модель: `sonnet`, `opus`, `haiku`, `fable`", risk: "low" },
@@ -68,10 +68,10 @@ window.CLI_COURSE.cheatsheet = {
     ] },
     { title: "Розширення", rows: [
       { cmd: "/mcp", desc: "Стан MCP-серверів; `reconnect`, `enable`, `disable`", risk: "low" },
-      { cmd: "/mcp__<сервер>__<промпт>", desc: "Команди, які експортує MCP-сервер", risk: "low" },
+      { cmd: "/mcp__<сервер>__<промпт>", desc: "Промпт MCP-сервера; у меню `/` видно як `/<сервер>:<промпт> (MCP)`", risk: "low" },
       { cmd: "/skills", desc: "Доступні skills", risk: "low" },
       { cmd: "/reload-skills", desc: "Підхопити нові skills без перезапуску", risk: "low" },
-      { cmd: ".claude/skills/<назва>/SKILL.md", desc: "Власна команда `/<назва>` для проєкту", risk: "medium" },
+      { cmd: ".claude/skills/<назва>/SKILL.md", desc: "Власна команда `/<назва>` для проєкту", risk: "medium", outsideTrainer: true },
       { cmd: "/agents", desc: "Субагенти (`.claude/agents/`)", risk: "low" },
       { cmd: "/hooks", desc: "Налаштовані hooks — автоматичні команди на події", risk: "low" },
       { cmd: "/plugin", desc: "Plugins: встановлення, увімкнення — лише довірені", risk: "medium" }
