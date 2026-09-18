@@ -1,588 +1,95 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Claude Code Slash Commands — Тренажер</title>
-  <style>
-    :root {
-      --bg: #0f0e0d; --panel: #1a1816; --border: #3d3835; --text: #ece7e1;
-      --muted: #9a928a; --green: #6fcf97; --cyan: #7ec8e3; --yellow: #e6c87a;
-      --accent: #d97757; --blue: #6eb5ff; --purple: #c4a7e7; --red: #f07178;
-      --prompt: #d97757;
-      --font: "SF Mono", Menlo, Consolas, monospace;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh;
-      background: radial-gradient(1200px 600px at 15% -10%, #3d2a22 0%, var(--bg) 55%);
-      color: var(--text); font-family: Inter, system-ui, sans-serif;
-    }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
-    header { margin-bottom: 16px; }
-    header h1 { font-size: 1.25rem; margin: 0 0 6px; font-weight: 600; }
-    header p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
-    .layout { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
-    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .sidebar { order: 2; } }
-    .sidebar, .terminal-wrap {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
-    }
-    .sidebar { padding: 14px; font-size: 0.82rem; }
-    .sidebar h2 {
-      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
-      color: var(--muted); margin: 0 0 10px;
-    }
-    .cmd-list { list-style: none; padding: 0; margin: 0 0 16px; max-height: 280px; overflow-y: auto; }
-    .cmd-list li {
-      padding: 5px 8px; border-radius: 6px; cursor: pointer;
-      font-family: var(--font); font-size: 0.76rem;
-    }
-    .cmd-list li:hover { background: #252220; }
-    .cmd-list li.done { color: var(--green); }
-    .cmd-list li.done::after { content: " ✓"; }
-    .cmd-list code { color: var(--cyan); }
-    .progress { height: 6px; background: #252220; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
-    .progress > div {
-      height: 100%; background: linear-gradient(90deg, var(--accent), var(--yellow));
-      width: 0%; transition: width 0.3s;
-    }
-    .stats { color: var(--muted); font-size: 0.78rem; }
-    .hint-box {
-      background: #252220; border-radius: 8px; padding: 10px;
-      color: var(--muted); line-height: 1.45; font-size: 0.78rem;
-    }
-    .module-badge {
-      display: inline-block; background: #252220; border: 1px solid var(--border);
-      border-radius: 6px; padding: 4px 8px; font-size: 0.78rem;
-      color: var(--accent); margin-bottom: 10px; font-family: var(--font);
-    }
-    .module-nav { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-    .module-nav button { text-align: left; font-family: var(--font); font-size: 0.7rem; }
-    .module-nav button.active { border-color: var(--accent); color: var(--accent); }
-    .terminal-wrap { display: flex; flex-direction: column; height: 540px; }
-    .term-bar {
-      display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-      border-bottom: 1px solid var(--border); font-size: 0.78rem; color: var(--muted);
-    }
-    .dots { display: flex; gap: 6px; }
-    .dots span { width: 10px; height: 10px; border-radius: 50%; }
-    .dots span:nth-child(1) { background: #ff5f57; }
-    .dots span:nth-child(2) { background: #febc2e; }
-    .dots span:nth-child(3) { background: #28c840; }
-    .term-title { flex: 1; text-align: center; font-family: var(--font); }
-    .output {
-      flex: 1; display: flex; flex-direction: column; padding: 16px;
-      min-height: 0; overflow: hidden; font-family: var(--font); font-size: 0.84rem; line-height: 1.55;
-    }
-    .output-status {
-      flex-shrink: 0; color: var(--muted); font-size: 0.75rem;
-      padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border);
-    }
-    .live-panel { flex: 1; min-height: 0; overflow-y: auto; word-break: break-word; }
-    .line-user { color: var(--prompt); }
-    .line-muted { color: var(--muted); }
-    .line-ok { color: var(--green); }
-    .line-warn { color: var(--yellow); }
-    .line-err { color: var(--red); }
-    .line-cmd { color: var(--cyan); }
-    .line-hl { color: var(--blue); }
-    .line-uk-hint {
-      color: #e6c87a; font-size: 0.82rem; margin-top: 10px; padding-top: 8px;
-      border-top: 1px solid rgba(230, 200, 122, 0.25); line-height: 1.5;
-    }
-    .line-uk-hint.compact { margin-top: 2px; margin-bottom: 8px; padding-top: 0; border-top: none; padding-left: 14px; }
-    .result-box {
-      margin: 8px 0 12px; padding: 12px 14px; border-radius: 8px;
-      border: 1px solid #a85a3a; background: rgba(217, 119, 87, 0.1); border-left: 4px solid var(--accent);
-    }
-    .result-box.warn { border-color: var(--yellow); background: rgba(230, 200, 122, 0.08); border-left-color: var(--yellow); }
-    .result-box.purple { border-color: var(--purple); background: rgba(196, 167, 231, 0.1); border-left-color: var(--purple); }
-    .result-title { color: var(--accent); font-weight: 600; margin-bottom: 8px; font-size: 0.82rem; }
-    .result-box.warn .result-title { color: var(--yellow); }
-    .result-box.purple .result-title { color: var(--purple); }
-    .input-row {
-      display: flex; align-items: center; gap: 8px; padding: 12px 14px;
-      border-top: 1px solid var(--border); background: #0f0e0d;
-    }
-    .prompt-label { color: var(--prompt); font-family: var(--font); font-size: 0.9rem; white-space: nowrap; }
-    #cmdInput {
-      flex: 1; background: transparent; border: none; outline: none;
-      color: var(--text); font-family: var(--font); font-size: 0.9rem;
-    }
-    .btn {
-      background: #252220; border: 1px solid var(--border); color: var(--text);
-      border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.78rem;
-    }
-    .btn:hover { background: #302c28; }
-    .btn-primary { background: #8b4518; border-color: var(--accent); }
-    .btn-primary:hover { background: var(--accent); color: #0f0e0d; }
-    .btn-test { background: rgba(230, 200, 122, 0.12); border-color: var(--yellow); color: #e6c87a; }
-    .btn-test.active { background: var(--yellow); color: #0f0e0d; }
-    .actions { display: flex; flex-direction: column; gap: 8px; }
-    .test-question { color: #e6c87a; line-height: 1.6; margin-bottom: 10px; }
-    kbd {
-      background: #252220; border: 1px solid var(--border); border-radius: 4px;
-      padding: 1px 5px; font-family: var(--font); font-size: 0.78rem;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F8F9FF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="AI-агент у терміналі без хаосу: slash-команди, режими дозволів, контекст, review коду, моделі, MCP і фонові агенти.">
+  <title>Claude Code: slash-команди</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230B57D0'/%3E%3Cpath d='M6 8l4 4-4 4M12 16h6' stroke='%23FFFFFF' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="engine/md3.css">
+  <link rel="stylesheet" href="engine/course.css">
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Claude Code — Slash Commands Trainer</h1>
-      <p>
-        Інтерактивний тренажер на основі
-        <code>claude_code_slash_commands_uk.md</code>.
-        Вводь <kbd>/</kbd>-команди, проходь розділи, потім — <strong>режим тестування</strong>.
-        <kbd>↑</kbd>/<kbd>↓</kbd> історія · <kbd>Tab</kbd> автодоповнення.
-      </p>
-    </header>
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="module-badge" id="moduleBadge">Щоденний мінімум</div>
-        <h2>Прогрес розділу</h2>
-        <div class="progress"><div id="progressBar"></div></div>
-        <div class="stats" id="progressText">0 / 0</div>
-        <h2>Розділи</h2>
-        <div class="module-nav" id="moduleNav"></div>
-        <h2>Команди розділу</h2>
-        <ul class="cmd-list" id="cmdChecklist"></ul>
-        <div class="hint-box">
-          <strong>Завдання:</strong> виконай усі команди розділу.<br><br>
-          <strong>Підказка:</strong> <code>/</code> — список · аргументи після команди<br>
-          <strong>Тест:</strong> «Режим тестування» — вгадай команду за описом
-        </div>
-        <div class="actions" style="margin-top:14px;">
-          <button class="btn btn-test" id="btnTest" type="button">Режим тестування</button>
-          <button class="btn btn-primary" id="btnStart">Нова сесія</button>
-          <button class="btn" id="btnClear">Очистити</button>
-        </div>
-      </aside>
-      <section class="terminal-wrap">
-        <div class="term-bar">
-          <div class="dots"><span></span><span></span><span></span></div>
-          <div class="term-title" id="termTitle">claude — demo-project</div>
-        </div>
-        <div class="output" aria-live="polite">
-          <div class="output-status" id="outputStatus">claude&gt; · slash commands</div>
-          <div class="live-panel" id="livePanel"></div>
-        </div>
-        <form class="input-row" id="cmdForm" autocomplete="off">
-          <span class="prompt-label" id="promptLabel">claude&gt;</span>
-          <input id="cmdInput" type="text" spellcheck="false" placeholder="/init, /plan, /status …" autofocus />
-        </form>
-      </section>
-    </div>
+  <a class="skip-link" href="#main">Перейти до вмісту</a>
+
+  <header class="top-app-bar" id="top-app-bar">
+    <a class="brand" href="#/" aria-label="Claude Code: slash-команди — на головну">
+      <span class="brand-mark" data-icon="terminal"></span>
+      <span class="brand-text">
+        <span class="brand-title">Claude Code: slash-команди</span>
+        <span class="brand-sub">курс slash-команд Claude Code</span>
+      </span>
+    </a>
+    <a class="icon-btn" href="#/cheatsheet" aria-label="Шпаргалка" title="Шпаргалка" data-icon="description"></a>
+    <a class="icon-btn" href="#/glossary" aria-label="Словник" title="Словник" data-icon="book"></a>
+    <button class="icon-btn" type="button" id="menu-button" aria-label="Налаштування" title="Налаштування" aria-haspopup="menu" aria-expanded="false" aria-controls="app-menu" data-icon="more_vert"></button>
+  </header>
+
+  <nav class="app-nav" aria-label="Основна навігація">
+    <a href="#/" data-nav="home"><span class="nav-indicator" data-icon="home"></span><span>Головна</span></a>
+    <a href="#/modules" data-nav="modules"><span class="nav-indicator" data-icon="school"></span><span>Модулі</span></a>
+    <a href="#/sandbox" data-nav="sandbox"><span class="nav-indicator" data-icon="sandbox"></span><span>Пісочниця</span></a>
+    <a href="#/cheatsheet" data-nav="cheatsheet"><span class="nav-indicator" data-icon="description"></span><span>Шпаргалка</span></a>
+    <a href="#/about" data-nav="about"><span class="nav-indicator" data-icon="info"></span><span>Про курс</span></a>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <div class="page"><p class="muted">Завантаження курсу…</p></div>
+    <noscript><p>Для роботи курсу потрібен увімкнений JavaScript.</p></noscript>
+  </main>
+
+  <footer class="site-footer">
+    <div>Claude Code: slash-команди · працює офлайн, прогрес зберігається лише в цьому браузері · <a href="#/about">Про курс</a></div>
+  </footer>
+
+  <div class="menu" id="app-menu" role="menu" aria-label="Налаштування" hidden>
+    <button class="menu-item" type="button" role="menuitemcheckbox" id="unlock-toggle" aria-checked="false">
+      <span data-icon="lock_open"></span>
+      <span class="mi-text">Відкрити всі уроки<span class="mi-sub">Для тих, хто вже має досвід</span></span>
+      <span class="switch" aria-hidden="true"><span class="track"></span><span class="thumb"></span></span>
+    </button>
+    <div class="menu-divider" role="separator"></div>
+    <button class="menu-item" type="button" role="menuitem" id="reset-open">
+      <span data-icon="restart"></span>
+      <span class="mi-text">Скинути прогрес</span>
+    </button>
+    <a class="menu-item" role="menuitem" href="#/glossary">
+      <span data-icon="book"></span>
+      <span class="mi-text">Словник</span>
+    </a>
+    <a class="menu-item" role="menuitem" href="#/about">
+      <span data-icon="info"></span>
+      <span class="mi-text">Про курс і правила безпеки</span>
+    </a>
   </div>
-  <script>
-    const DATA = {"modules": {"essentials": {"id": "essentials", "title": "Щоденний мінімум", "intro": "80/20 набір для реальної роботи з кодом.", "termTitle": "claude — demo-project", "commands": ["/init", "/memory", "/plan", "/model", "/context", "/compact", "/clear", "/diff", "/simplify", "/security-review", "/permissions", "/agents", "/skills", "/reload-skills", "/doctor", "/status", "/usage", "/resume", "/rewind", "/verify"]}, "project": {"id": "project", "title": "Проєкт і налаштування", "intro": "init, memory, permissions, MCP, інтеграції.", "termTitle": "claude — ~/Projects/demo", "commands": ["/add-dir", "/allowed-tools", "/cd", "/chrome", "/config", "/design-login", "/design-sync", "/fewer-permission-prompts", "/hooks", "/ide", "/install-github-app", "/install-slack-app", "/login", "/logout", "/passes", "/plugin", "/powerup", "/privacy-settings", "/remote-env", "/sandbox", "/settings", "/setup-bedrock", "/setup-vertex", "/team-onboarding", "/upgrade", "/usage-credits", "/vim", "/web-setup"]}, "context": {"id": "context", "title": "Сесія і контекст", "intro": "clear, compact, resume, rewind, export.", "termTitle": "claude — session", "commands": ["/branch", "/btw", "/checkpoint", "/continue", "/copy", "/exit", "/export", "/focus", "/help", "/insights", "/new", "/quit", "/recap", "/release-notes", "/reload-plugins", "/rename", "/reset", "/undo", "/workflows"]}, "code": {"id": "code", "title": "Код і review", "intro": "diff, code-review, security-review, verify.", "termTitle": "claude — feature/auth", "commands": ["/autofix-pr", "/review", "/run", "/run-skill-generator", "/ultrareview"]}, "agents": {"id": "agents", "title": "Агенти і фон", "intro": "background, fork, batch, teleport, ultraplan.", "termTitle": "claude — bg-agent", "commands": ["/app", "/background", "/bashes", "/batch", "/bg", "/deep-research", "/desktop", "/fork", "/loop", "/proactive", "/rc", "/remote-control", "/routines", "/schedule", "/stop", "/tasks", "/teleport", "/tp", "/ultraplan"]}, "settings": {"id": "settings", "title": "Модель і UI", "intro": "model, effort, theme, status, usage.", "termTitle": "claude — settings", "commands": ["/android", "/cost", "/debug", "/ios", "/mobile", "/radio", "/scroll-speed", "/stats", "/statusline", "/stickers", "/terminal-setup", "/theme"]}, "extra": {"id": "extra", "title": "Додаткові команди", "intro": "Решта slash-команд з довідника.", "termTitle": "claude — extra", "commands": ["/feedback", "/bug", "/share", "/heapdump", "/keybindings", "/pr-comments"]}}, "hints": {"/add-dir": "Додає ще одну робочу директорію, до якої Claude матиме доступ у поточній сесії.", "/agents": "Керування agent/subagent конфігураціями.", "/autofix-pr": "Запускає Claude Code on the web для автоматичного виправлення проблем у pull request: CI failures, review comments тощо.", "/background": "Від’єднує поточну сесію і запускає її як background agent, звільняючи terminal.", "/bg": "Аліас для `/background`.", "/batch": "Bundled skill/workflow для великих змін у кодовій базі. Розбиває задачу на незалежні частини, запускає subagents у git worktrees, може створювати PR.", "/branch": "Створює відгалуження поточної розмови, щоб спробувати інший напрямок без втрати основної сесії.", "/btw": "Дозволяє поставити коротке side-question без засмічення основного контексту.", "/cd": "Переміщує поточну сесію в іншу робочу директорію.", "/chrome": "Налаштування Claude in Chrome.", "/clear": "Починає нову розмову з порожнім контекстом. Попередня сесія зберігається і може бути відновлена через `/resume`.", "/reset": "Аліас для `/clear`.", "/new": "Аліас для `/clear`.", "/compact": "Стискає історію розмови, створюючи summary, щоб звільнити context window. Можна передати інструкції, що саме зберегти у summary.", "/config": "Відкриває або змінює налаштування Claude Code: theme, model, output style та інші параметри.", "/settings": "Аліас для `/config`.", "/context": "Показує використання context window: що займає місце, де є ризик переповнення, які є оптимізації.", "/copy": "Копіює останню або N-ту відповідь Claude у clipboard. Якщо є code blocks, можна вибрати конкретний блок.", "/cost": "Аліас для `/usage`.", "/debug": "Вмикає debug logging для поточної сесії і допомагає аналізувати проблеми через debug log.", "/deep-research": "Workflow для глибокого дослідження: запускає web searches, перевіряє джерела і формує звіт із посиланнями.", "/design-login": "Авторизація доступу до design-system для `/design-sync`.", "/design-sync": "Конвертує React design system із репозиторію і завантажує його в Claude Design, щоб Claude використовував реальні компоненти проєкту.", "/desktop": "Продовжити поточну сесію в Claude Code Desktop app.", "/app": "Аліас для `/desktop`.", "/diff": "Відкриває інтерактивний diff viewer для uncommitted changes і змін по turn-ах Claude.", "/doctor": "Діагностика встановлення і налаштувань Claude Code. Може запропонувати автоматичне виправлення.", "/exit": "Вихід із CLI. Якщо сесія background-attached, команда від’єднує термінал, але не зупиняє background session.", "/quit": "Аліас для `/exit`.", "/export": "Експортує поточну розмову як plain text. Може зберегти у файл або скопіювати в clipboard.", "/feedback": "Надіслати feedback, bug report або поділитися розмовою.", "/bug": "Аліас для `/feedback`.", "/share": "Аліас для `/feedback`.", "/fewer-permission-prompts": "Skill, який аналізує часті read-only Bash/MCP calls і додає allowlist у `.claude/settings.json`, щоб зменшити кількість permission prompts.", "/focus": "Вмикає focus view: показує останній prompt, короткий summary tool-calls і фінальну відповідь.", "/fork": "Запускає forked background subagent, який успадковує повний контекст і виконує окрему директиву паралельно.", "/heapdump": "Створює JavaScript heap snapshot і memory breakdown для діагностики великого споживання пам’яті.", "/help": "Показує help і доступні команди.", "/hooks": "Показує конфігурації hooks для tool events.", "/ide": "Керує IDE integrations і показує їхній статус.", "/init": "Ініціалізує проєкт, створюючи `CLAUDE.md` guide. Новіші режими можуть провести через skills, hooks і memory files.", "/insights": "Генерує звіт по ваших Claude Code sessions: області проєкту, патерни взаємодії, friction points.", "/install-github-app": "Встановлює Claude GitHub App для репозиторію, може допомогти з GitHub Actions workflows/secrets.", "/install-slack-app": "Встановлює Claude Slack app через OAuth.", "/keybindings": "Відкриває файл keyboard shortcuts.", "/login": "Увійти в Anthropic account.", "/logout": "Вийти з Anthropic account.", "/loop": "Skill для повторного запуску prompt через інтервал або в автономному режимі.", "/proactive": "Аліас для `/loop`.", "/memory": "Редагує `CLAUDE.md` memory files, auto-memory і memory entries.", "/mobile": "Показує QR code для завантаження Claude mobile app.", "/ios": "Аліас для `/mobile`.", "/android": "Аліас для `/mobile`.", "/model": "Перемикає AI model і може зберегти її як default для нових сесій.", "/passes": "Дозволяє поділитися free week of Claude Code з друзями, якщо акаунт eligible.", "/permissions": "Керує allow/ask/deny правилами для tools.", "/allowed-tools": "Аліас для `/permissions`.", "/plan": "Входить у plan mode. Claude спочатку досліджує і пропонує план, не редагуючи код.", "/plugin": "Керує Claude Code plugins: list, install, enable, disable тощо.", "/powerup": "Інтерактивні уроки з функцій Claude Code.", "/pr-comments": "Видалена в новіших версіях. Раніше показувала GitHub PR comments через `gh` CLI.", "/privacy-settings": "Перегляд і зміна privacy settings.", "/radio": "Відкриває Claude FM lo-fi radio у браузері або показує stream URL.", "/recap": "Генерує one-line summary поточної сесії.", "/release-notes": "Відкриває changelog/release notes у version picker.", "/reload-plugins": "Перезавантажує активні plugins без рестарту Claude Code.", "/reload-skills": "Перескановує skills і command directories, щоб нові/змінені skills стали доступними без рестарту.", "/remote-control": "Робить локальну сесію доступною для remote control з claude.ai.", "/rc": "Аліас для `/remote-control`.", "/remote-env": "Вибір default environment для cloud agents.", "/rename": "Перейменовує поточну сесію; без аргументів генерує назву автоматично.", "/resume": "Відновлює попередню розмову за ID/назвою або відкриває picker.", "/continue": "Аліас для `/resume`.", "/review": "Робить review GitHub pull request, використовуючи той самий review engine, що `/code-review`.", "/rewind": "Відкочує conversation і/або code до попереднього checkpoint або робить summary з вибраного повідомлення.", "/checkpoint": "Аліас для `/rewind`.", "/undo": "Аліас для `/rewind`.", "/run": "Skill, який запускає і перевіряє ваш app у реальному виконанні, а не тільки через tests/types.", "/run-skill-generator": "Створює/навчає per-project skill для `/run` і `/verify`, щоб Claude знав, як build/run/test саме цей проєкт.", "/sandbox": "Вмикає/вимикає sandbox mode.", "/schedule": "Створює, оновлює, показує або запускає routines на Anthropic-managed cloud infrastructure.", "/routines": "Аліас для `/schedule`.", "/scroll-speed": "Налаштовує швидкість прокрутки мишкою в fullscreen rendering.", "/security-review": "Аналізує pending changes на security vulnerabilities: injection, auth issues, data exposure тощо.", "/setup-bedrock": "Інтерактивне налаштування Amazon Bedrock: auth, region, model pins.", "/setup-vertex": "Інтерактивне налаштування Google Vertex AI: auth, project, region, model pins.", "/simplify": "Review зміненого коду на cleanup opportunities і застосування fixes. Не фокусується на bugs у новіших версіях.", "/skills": "Показує доступні skills, дозволяє сортувати за token count і ховати skills з меню.", "/stats": "Аліас для `/usage`, відкриває Stats tab.", "/status": "Відкриває Status tab: version, model, account, connectivity.", "/statusline": "Налаштовує status line Claude Code.", "/stickers": "Замовлення Claude Code stickers.", "/stop": "Зупиняє поточну background session, якщо ви attached до неї. Transcript і worktree зберігаються.", "/tasks": "Показує і дозволяє керувати тим, що виконується у background.", "/bashes": "Аліас для `/tasks`.", "/team-onboarding": "Генерує onboarding guide для команди на основі історії використання Claude Code за останні 30 днів.", "/teleport": "Підтягує Claude Code on the web session у локальний terminal: обирає сесію, fetch branch і conversation.", "/tp": "Аліас для `/teleport`.", "/terminal-setup": "Налаштовує terminal keybindings: Shift+Enter та інші shortcuts.", "/theme": "Змінює color theme Claude Code.", "/ultraplan": "Створює план в ultraplan session, дозволяє переглянути його в браузері, виконати remotely або повернути в terminal.", "/ultrareview": "Глибокий multi-agent code review у cloud sandbox. Зараз рекомендований варіант — `/code-review ultra`; `/ultrareview` лишається як alias.", "/upgrade": "Відкриває сторінку upgrade для переходу на вищий план.", "/usage": "Показує session cost, plan usage limits і activity stats. На платних планах може показувати breakdown за skills/subagents/plugins/MCP.", "/usage-credits": "Налаштовує usage credits, щоб продовжити роботу після досягнення ліміту.", "/verify": "Skill, який підтверджує, що code change реально працює: build, run app, observe result.", "/vim": "Видалена у v2.1.92. Для Vim/Normal editing mode треба використовувати `/config` → Editor mode.", "/web-setup": "Підключає GitHub account до Claude Code on the web через локальні `gh` credentials.", "/workflows": "Відкриває workflow progress view: watch, pause, resume, save workflows.", "welcome": "Тренажер Claude Code slash-команд — емуляція без API.", "prompt": "Текст після /команди — аргументи. Натисни / для списку.", "unknown": "Немає в емуляторі. Клікни команду зліва або введи /.", "module-switch": "Новий розділ — список команд зліва оновився.", "module-wrong": "Команда з іншого розділу. Перейди туди зліва.", "ctrl-c": "Ctrl+C перериває (у тренажері сесія лишається активною)."}, "meta": {"/add-dir": "Коли треба дозволити Claude читати/редагувати файли не тільки з поточного каталогу.", "/agents": "Коли хочеш налаштувати спеціалізованих агентів для окремих задач.", "/autofix-pr": "Коли є PR і треба автоматично лагодити коментарі або помилки CI. Потрібен `gh` CLI і доступ до Claude Code on the web.", "/background": "Для довгих задач, які не треба тримати відкритими в активному терміналі.", "/bg": "Те саме, що `/background`.", "/batch": "Для великих міграцій або рефакторингів, які можна паралелити.", "/branch": "Коли хочеш протестувати альтернативне рішення або інший підхід.", "/btw": "Для швидких уточнень “між іншим”, які не мають ставати частиною основної задачі.", "/cd": "Коли треба продовжити цю ж сесію, але працювати з іншим каталогом.", "/chrome": "Коли використовується інтеграція Claude з Chrome.", "/clear": "Коли контекст забруднений або треба почати нову задачу.", "/reset": "Те саме, що `/clear`.", "/new": "Те саме, що `/clear`.", "/compact": "Коли сесія стала довгою, але не хочеш починати з нуля.", "/config": "Для зміни конфігурації Claude Code.", "/settings": "Те саме, що `/config`.", "/context": "Коли сесія довга або Claude починає “губити” контекст.", "/copy": "Щоб швидко забрати відповідь, код або інструкцію з Claude.", "/cost": "Для перегляду вартості/usage.", "/debug": "Коли Claude Code працює нестабільно або треба знайти технічну причину проблеми.", "/deep-research": "Для research-задач, де потрібні джерела і перевірка фактів.", "/design-login": "Перед використанням `/design-sync`.", "/design-sync": "Для фронтенд-проєктів із власною дизайн-системою.", "/desktop": "Коли хочеш перенести роботу з terminal у desktop app.", "/app": "Те саме, що `/desktop`.", "/diff": "Перед commit або review, щоб побачити, що саме змінив Claude.", "/doctor": "Якщо щось не працює: permissions, install, auth, runtime.", "/exit": "Коли треба закрити Claude Code.", "/quit": "Те саме, що `/exit`.", "/export": "Для архіву, документації або передачі контексту іншому інструменту.", "/feedback": "Коли знайшов баг або хочеш відправити відгук Anthropic.", "/bug": "Для bug report.", "/share": "Для поширення/надсилання session context.", "/fewer-permission-prompts": "Коли Claude надто часто питає дозволи на безпечні повторювані дії.", "/focus": "Для менш шумного інтерфейсу під час роботи.", "/fork": "Коли треба віддати side-task агенту, не перериваючи основну роботу.", "/heapdump": "Якщо Claude Code або Node-процес споживає забагато RAM.", "/help": "Коли забув команду або хочеш побачити доступні опції.", "/hooks": "Для контролю поведінки Claude перед/після tool calls.", "/ide": "Для інтеграції з VS Code, Cursor або іншими IDE.", "/init": "Перша команда в новому репозиторії. Дуже корисна.", "/insights": "Для аналізу, як ви використовуєте Claude Code і де є вузькі місця.", "/install-github-app": "Коли хочеш інтегрувати Claude з GitHub repo.", "/install-slack-app": "Для інтеграції Claude зі Slack.", "/keybindings": "Коли треба налаштувати гарячі клавіші.", "/login": "Для авторизації Claude Code.", "/logout": "Для зміни акаунта або завершення доступу.", "/loop": "Для перевірок “кожні 5 хвилин” або циклічної підтримки задачі.", "/proactive": "Те саме, що `/loop`.", "/memory": "Коли треба змінити довготривалі інструкції для проєкту або користувача.", "/mobile": "Якщо хочеш продовжувати роботу з мобільного.", "/ios": "Те саме, що `/mobile`.", "/android": "Те саме, що `/mobile`.", "/model": "Коли треба змінити модель під задачу: швидше, дешевше або розумніше.", "/passes": "Якщо така опція доступна у вашому акаунті.", "/permissions": "Критично важливо для безпечної роботи з файлами, Bash, MCP.", "/allowed-tools": "Те саме, що `/permissions`.", "/plan": "Перед великими змінами, міграціями, ризиковими операціями.", "/plugin": "Для розширення Claude Code через plugins.", "/powerup": "Для навчання можливостям Claude Code.", "/pr-comments": "На нових версіях краще просто попросити Claude переглянути PR comments.", "/privacy-settings": "Для Pro/Max users, якщо доступно.", "/radio": "Не робоча команда для коду, а “атмосфера”. Трохи дивно, але живемо з цим.", "/recap": "Щоб швидко згадати, про що була сесія.", "/release-notes": "Коли треба подивитися, що змінилося в Claude Code.", "/reload-plugins": "Коли змінив plugin і треба підхопити зміни.", "/reload-skills": "Після додавання або редагування `.claude/skills` чи `.claude/commands`.", "/remote-control": "Щоб продовжити локальну сесію з іншого пристрою або web.", "/rc": "Те саме, що `/remote-control`.", "/remote-env": "Для налаштування середовища, де працюватимуть cloud agents.", "/rename": "Щоб легше знаходити сесії в `/resume`.", "/resume": "Коли треба повернутися до старої сесії.", "/continue": "Те саме, що `/resume`.", "/review": "Для перевірки PR.", "/rewind": "Коли Claude пішов не туди або треба повернутися до стабільного стану.", "/checkpoint": "Те саме, що `/rewind`.", "/undo": "Те саме, що `/rewind`.", "/run": "Для practical verification: “чи справді воно працює”.", "/run-skill-generator": "Один раз на проєкт, щоб автоматизувати перевірку запуску.", "/sandbox": "Для безпечнішого виконання команд у підтримуваних середовищах.", "/schedule": "Для регулярних cloud-задач.", "/routines": "Те саме, що `/schedule`.", "/scroll-speed": "Якщо scrolling у Claude Code незручний.", "/security-review": "Перед merge/deploy, особливо для backend, auth, API, infra.", "/setup-bedrock": "Якщо Claude Code працює через Amazon Bedrock.", "/setup-vertex": "Якщо Claude Code працює через Google Vertex AI.", "/simplify": "Після реалізації, щоб прибрати зайву складність.", "/skills": "Для керування skills у проєкті.", "/stats": "Для статистики використання.", "/status": "Для швидкої перевірки стану Claude Code.", "/statusline": "Для кастомізації prompt/status UI.", "/stickers": "Не технічна команда. Просто мерч.", "/stop": "Коли background-agent більше не потрібен.", "/tasks": "Для моніторингу background tasks.", "/bashes": "Те саме, що `/tasks`.", "/team-onboarding": "Щоб швидко підготувати колег до роботи з вашим Claude Code workflow.", "/teleport": "Коли почав у web/cloud, а хочеш продовжити локально.", "/tp": "Те саме, що `/teleport`.", "/terminal-setup": "Якщо terminal/IDE неправильно обробляє гарячі клавіші.", "/theme": "Для візуальної кастомізації terminal UI.", "/ultraplan": "Для дуже великих задач, де потрібне серйозне планування.", "/ultrareview": "Для критичних PR або великих змін.", "/upgrade": "Якщо поточний план не покриває потреби.", "/usage": "Для контролю лімітів і витрат.", "/usage-credits": "Якщо часто впираєшся в usage limits.", "/verify": "Після змін у коді. Краще, ніж “тести зелені, а UI помер”.", "/vim": "Тільки для старих версій; у нових неактуальна.", "/web-setup": "Для інтеграції local GitHub auth з cloud/web Claude Code.", "/workflows": "Для керування workflow jobs."}, "aliases": {"/bg": "/background", "/reset": "/clear", "/new": "/clear", "/settings": "/config", "/cost": "/usage", "/stats": "/usage", "/quit": "/exit", "/app": "/desktop", "/bug": "/feedback", "/share": "/feedback", "/proactive": "/loop", "/routines": "/schedule", "/continue": "/resume", "/checkpoint": "/rewind", "/undo": "/rewind", "/allowed-tools": "/permissions", "/bashes": "/tasks", "/rc": "/remote-control", "/tp": "/teleport", "/ios": "/mobile", "/android": "/mobile"}, "allCommands": ["/add-dir", "/agents", "/autofix-pr", "/background", "/bg", "/batch", "/branch", "/btw", "/cd", "/chrome", "/clear", "/reset", "/new", "/compact", "/config", "/settings", "/context", "/copy", "/cost", "/debug", "/deep-research", "/design-login", "/design-sync", "/desktop", "/app", "/diff", "/doctor", "/exit", "/quit", "/export", "/feedback", "/bug", "/share", "/fewer-permission-prompts", "/focus", "/fork", "/heapdump", "/help", "/hooks", "/ide", "/init", "/insights", "/install-github-app", "/install-slack-app", "/keybindings", "/login", "/logout", "/loop", "/proactive", "/memory", "/mobile", "/ios", "/android", "/model", "/passes", "/permissions", "/allowed-tools", "/plan", "/plugin", "/powerup", "/pr-comments", "/privacy-settings", "/radio", "/recap", "/release-notes", "/reload-plugins", "/reload-skills", "/remote-control", "/rc", "/remote-env", "/rename", "/resume", "/continue", "/review", "/rewind", "/checkpoint", "/undo", "/run", "/run-skill-generator", "/sandbox", "/schedule", "/routines", "/scroll-speed", "/security-review", "/setup-bedrock", "/setup-vertex", "/simplify", "/skills", "/stats", "/status", "/statusline", "/stickers", "/stop", "/tasks", "/bashes", "/team-onboarding", "/teleport", "/tp", "/terminal-setup", "/theme", "/ultraplan", "/ultrareview", "/upgrade", "/usage", "/usage-credits", "/verify", "/vim", "/web-setup", "/workflows"]};
-    const MODULES = DATA.modules;
-    const UK_HINTS = DATA.hints;
-    const CMD_META = DATA.meta;
-    const ALIASES = DATA.aliases;
 
-    const state = {
-      currentModule: "essentials",
-      claudeMd: false,
-      compacted: false,
-      model: "claude-sonnet-4",
-      effort: "high",
-      history: [], histIdx: -1,
-      triedByModule: Object.fromEntries(Object.keys(MODULES).map(k => [k, new Set()])),
-      testMode: { active: false, queue: [], index: 0, correct: 0, wrong: 0 }
-    };
+  <dialog class="md-dialog" id="reset-dialog" aria-labelledby="reset-title" aria-describedby="reset-desc">
+    <div class="dlg-icon" data-icon="restart"></div>
+    <h2 class="headline-small" id="reset-title">Скинути прогрес?</h2>
+    <p id="reset-desc">Усі пройдені кроки, результати quiz та іспиту буде видалено з цього браузера. Цю дію не можна скасувати.</p>
+    <div class="actions">
+      <button class="btn btn-text" type="button" value="cancel" id="reset-cancel">Скасувати</button>
+      <button class="btn btn-danger" type="button" id="reset-confirm">Скинути</button>
+    </div>
+  </dialog>
 
-    const livePanel = document.getElementById("livePanel");
-    const outputStatus = document.getElementById("outputStatus");
-    const cmdInput = document.getElementById("cmdInput");
-    const progressBar = document.getElementById("progressBar");
-    const progressText = document.getElementById("progressText");
-    const cmdChecklist = document.getElementById("cmdChecklist");
-    const moduleBadge = document.getElementById("moduleBadge");
-    const moduleNav = document.getElementById("moduleNav");
-    const termTitle = document.getElementById("termTitle");
-    let viewChunks = [];
+  <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
 
-    function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-    function getModule() { return MODULES[state.currentModule] || MODULES.essentials; }
-    function getCurrentCommands() { return getModule().commands; }
-    function getTried() { return state.triedByModule[state.currentModule]; }
-
-    function resolveCmd(cmd) {
-      const c = cmd.trim();
-      const lower = c.toLowerCase();
-      const base = lower.split(/\s+/)[0];
-      return ALIASES[base] ? c.replace(/^\S+/, ALIASES[base]) : c;
-    }
-
-    function commandBase(cmd) {
-      const r = resolveCmd(cmd).trim().toLowerCase();
-      return r.split(/\s+/)[0];
-    }
-
-    function matchesListed(cmd, listed) {
-      const lower = resolveCmd(cmd).trim().toLowerCase();
-      const l = listed.toLowerCase();
-      if (lower === l) return true;
-      const base = commandBase(cmd);
-      if (base === l) return true;
-      if (lower.startsWith(l + " ")) return true;
-      return false;
-    }
-
-    function findListed(cmd, list) {
-      return list.find(x => matchesListed(cmd, x)) || null;
-    }
-
-    function normalizeCmd(raw) {
-      const cur = findListed(raw, getCurrentCommands());
-      if (cur) return cur;
-      for (const mod of Object.values(MODULES)) {
-        const ex = findListed(raw, mod.commands);
-        if (ex) return ex;
-      }
-      return commandBase(raw);
-    }
-
-    function isInCurrentModule(cmd) { return !!findListed(cmd, getCurrentCommands()); }
-
-    function findModuleForCommand(cmd) {
-      for (const [id, mod] of Object.entries(MODULES)) {
-        if (findListed(cmd, mod.commands)) return id;
-      }
-      return null;
-    }
-
-    function beginView(cmd) {
-      viewChunks = [];
-      if (cmd != null) viewChunks.push(`<div class="line-user">claude&gt; ${esc(cmd)}</div>`);
-    }
-    function print(html, cls = "line-sys") { viewChunks.push(`<div class="${cls}">${html}</div>`); }
-    function ukHint(text, compact = false) {
-      const c = compact ? "line-uk-hint compact" : "line-uk-hint";
-      return `<div class="${c}">${esc(text)}</div>`;
-    }
-    function printResult(title, body, type = "ok", hint = null) {
-      const cls = type === "warn" ? "result-box warn" : type === "purple" ? "result-box purple" : "result-box";
-      viewChunks.push(`<div class="${cls}"><div class="result-title">${esc(title)}</div>${body}${hint ? ukHint(hint) : ""}</div>`);
-    }
-    function flushView(status) {
-      livePanel.innerHTML = viewChunks.join("");
-      livePanel.scrollTop = 0;
-      if (status) outputStatus.textContent = status;
-    }
-
-    function markTried(cmd) {
-      const norm = findListed(cmd, getCurrentCommands());
-      if (norm) { getTried().add(norm); updateProgress(); updateModuleNav(); }
-    }
-
-    function updateProgress() {
-      const cmds = getCurrentCommands();
-      const n = getTried().size;
-      moduleBadge.textContent = getModule().title;
-      termTitle.textContent = getModule().termTitle;
-      progressBar.style.width = cmds.length ? `${(n / cmds.length) * 100}%` : "0%";
-      progressText.textContent = `${n} / ${cmds.length} команд`;
-      cmdChecklist.querySelectorAll("li").forEach(li => {
-        li.classList.toggle("done", getTried().has(li.dataset.cmd));
-      });
-    }
-
-    function updateModuleNav() {
-      moduleNav.innerHTML = Object.values(MODULES).map(mod => {
-        const t = state.triedByModule[mod.id];
-        const pct = mod.commands.length ? Math.round((t.size / mod.commands.length) * 100) : 0;
-        const act = mod.id === state.currentModule ? " active" : "";
-        return `<button type="button" class="btn${act}" data-module="${mod.id}">${esc(mod.title)} · ${t.size}/${mod.commands.length} (${pct}%)</button>`;
-      }).join("");
-      moduleNav.querySelectorAll("button").forEach(btn => {
-        btn.addEventListener("click", () => switchModule(btn.dataset.module));
-      });
-    }
-
-    function buildChecklist() {
-      cmdChecklist.innerHTML = getCurrentCommands().map(c =>
-        `<li data-cmd="${esc(c)}" title="Клік — виконати"><code>${esc(c)}</code></li>`
-      ).join("");
-      cmdChecklist.querySelectorAll("li").forEach(li => {
-        li.addEventListener("click", () => { execute(li.dataset.cmd); cmdInput.value = ""; cmdInput.focus(); });
-      });
-      updateProgress();
-      updateModuleNav();
-    }
-
-    function switchModule(id) {
-      if (!MODULES[id]) return;
-      state.currentModule = id;
-      buildChecklist();
-      beginView(null);
-      const m = getModule();
-      printResult(`Розділ: ${m.title}`, `
-        <span class="line-muted">${esc(m.intro)}</span><br>
-        <span class="line-hl">Команд:</span> ${m.commands.length}
-      `, "purple", UK_HINTS["module-switch"]);
-      flushView(`claude&gt; · ${m.title}`);
-    }
-
-    function welcome() {
-      beginView(null);
-      print(`<span class="line-muted">Claude Code Slash Commands Trainer (емуляція)</span>`);
-      printResult("Почни з щоденного мінімуму", `
-        <span class="line-cmd">/init</span> · <span class="line-cmd">/plan</span> · <span class="line-cmd">/permissions</span><br>
-        <span class="line-cmd">/diff</span> · <span class="line-cmd">/code-review</span> · <span class="line-cmd">/verify</span>
-      `, "ok", UK_HINTS.welcome);
-      flushView("claude&gt; · введи /команду");
-    }
-
-    function listSlashCommands() {
-      print(`<span class="line-hl">Slash commands (${esc(getModule().title)}):</span>`);
-      getCurrentCommands().forEach(c => {
-        print(`  <span class="line-cmd">${esc(c.padEnd(22))}</span> <span class="line-muted">${esc((CMD_META[c] || "").slice(0, 60))}</span>`);
-        if (UK_HINTS[c]) print(ukHint(UK_HINTS[c], true));
-      });
-    }
-
-    function emulateSlash(cmd) {
-      const resolved = resolveCmd(cmd);
-      const base = commandBase(cmd);
-      const arg = resolved.slice(base.length).trim();
-      const listed = normalizeCmd(cmd);
-      const hint = UK_HINTS[listed] || UK_HINTS[base];
-      const when = CMD_META[listed] || CMD_META[base] || "";
-
-      const outputs = {
-        "/init": () => {
-          state.claudeMd = true;
-          return `<span class="line-ok">✓ CLAUDE.md scaffold created</span><br><span class="line-muted">Project guide ready — edit and commit.</span>`;
-        },
-        "/memory": () => `<span class="line-ok">✓ Memory editor opened</span> · CLAUDE.md, auto-memory, entries`,
-        "/plan": () => `<span class="line-ok">● Plan mode active</span>${arg ? `<br><span class="line-muted">Task: ${esc(arg)}</span>` : ""}<br><span class="line-muted">Claude explores before editing code.</span>`,
-        "/compact": () => { state.compacted = true; return `<span class="line-ok">✓ Conversation summarized</span>${arg ? ` · keep: ${esc(arg)}` : ""}`; },
-        "/clear": () => { state.compacted = false; return `<span class="line-ok">✓ New conversation — context cleared</span><br><span class="line-muted">Previous session saved → /resume</span>`; },
-        "/status": () => `<span class="line-hl">Version</span> 2.1.x (emulator)<br><span class="line-hl">Model</span> ${state.model}<br><span class="line-hl">CLAUDE.md</span> ${state.claudeMd ? "present" : "missing — /init"}`,
-        "/permissions": () => `<span class="line-ok">● Permissions browser</span> · allow / ask / deny rules for tools`,
-        "/mcp": () => `<span class="line-ok">● MCP servers</span> · filesystem, github (demo)`,
-        "/diff": () => `<span class="line-ok">● Interactive diff viewer</span> · uncommitted + per-turn changes`,
-        "/code-review": () => `<span class="line-ok">✓ Code review started</span>${arg ? ` · level: ${esc(arg)}` : ""}`,
-        "/verify": () => `<span class="line-ok">✓ Verify skill</span> · build, run app, observe result`,
-        "/resume": () => `<span class="line-ok">● Session picker</span> · restore previous conversation`,
-        "/rewind": () => `<span class="line-ok">✓ Rewind to checkpoint</span> · conversation and/or code`,
-        "/background": () => `<span class="line-ok">✓ Detached as background agent</span>${arg ? `<br>${esc(arg)}` : ""}`,
-        "/doctor": () => `<span class="line-ok">✓ Installation diagnostics</span> · auth, permissions, runtime`,
-        "/model": () => `<span class="line-ok">● ${state.model}</span> ← active<br><span class="line-muted">○ claude-opus-4 · ○ claude-haiku-4</span>`,
-        "/usage": () => `<span class="line-ok">Session cost & plan limits</span> · skills/MCP breakdown on paid plans`,
-      };
-
-      const fn = outputs[base];
-      const body = fn ? fn() : `<span class="line-ok">✓ ${esc(when || UK_HINTS[base] || "Command executed")}</span><br><span class="line-muted">Emulated per Claude Code docs.</span>`;
-      const title = arg ? `${base} ${arg}` : base;
-      printResult(title, body, "ok", hint);
-      return true;
-    }
-
-    function handleSlash(cmd) {
-      if (!cmd.startsWith("/")) return false;
-
-      if (!isInCurrentModule(cmd)) {
-        const owner = findModuleForCommand(cmd);
-        if (owner && owner !== state.currentModule) {
-          print(`<span class="line-warn">⚠ «${esc(cmd)}» — розділ «${esc(MODULES[owner].title)}» (прогрес не зарахується)</span>`);
-        }
-      }
-
-      if (cmd === "/" || cmd === "/help") {
-        listSlashCommands();
-        return "/";
-      }
-
-      const base = commandBase(cmd);
-      if (UK_HINTS[base] || ALIASES[base] || findListed(cmd, DATA.allCommands)) {
-        emulateSlash(cmd);
-        return normalizeCmd(cmd);
-      }
-
-      printResult("Невідома команда", `<span class="line-muted">«${esc(cmd)}» — ${UK_HINTS.unknown}</span>`, "warn");
-      return false;
-    }
-
-    function execute(raw) {
-      const cmd = raw.trim();
-      if (!cmd) return;
-      if (state.testMode.active) { handleTestAnswer(cmd); return; }
-
-      state.history.push(cmd);
-      state.histIdx = state.history.length;
-      beginView(cmd);
-
-      if (cmd.startsWith("/")) {
-        const result = handleSlash(cmd);
-        flushView(`claude&gt; · ${getModule().title} · ${cmd}`);
-        if (result !== false) markTried(typeof result === "string" ? result : cmd);
-        return;
-      }
-
-      printResult("Промпт", `
-        <span class="line-ok">✓ «${esc(cmd)}»</span><br>
-        <span class="line-muted">AI-відповідь не емулюється — тренуй slash-команди.</span>
-      `, "ok", UK_HINTS.prompt);
-      flushView(`claude&gt; · prompt`);
-    }
-
-    function shuffleArray(arr) {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    function buildTestQueue() {
-      const seen = new Set(), items = [];
-      for (const mod of Object.values(MODULES)) {
-        for (const c of mod.commands) {
-          if (!seen.has(c) && UK_HINTS[c] && !c.includes("pr-comments") && c !== "/vim") {
-            seen.add(c);
-            items.push({ cmd: c, hint: UK_HINTS[c] });
-          }
-        }
-      }
-      return shuffleArray(items);
-    }
-
-    function updateTestButton() {
-      const btn = document.getElementById("btnTest");
-      btn.textContent = state.testMode.active ? "Зупинити тест" : "Режим тестування";
-      btn.classList.toggle("active", state.testMode.active);
-    }
-
-    function showTestQuestion() {
-      const tm = state.testMode;
-      const q = tm.queue[tm.index];
-      if (!q) { finishTestMode(); return; }
-      beginView(null);
-      printResult(`Питання ${tm.index + 1} / ${tm.queue.length}`, `
-        <div class="test-question">${esc(q.hint)}</div>
-        <span class="line-hl">Яка slash-команда?</span><br>
-        <span class="line-muted">Введи, напр. <span class="line-cmd">/init</span></span>
-      `, "purple");
-      flushView(`test&gt; · ${tm.index + 1}/${tm.queue.length}`);
-      cmdInput.placeholder = "Введи /команду…";
-      cmdInput.focus();
-    }
-
-    function startTestMode() {
-      state.testMode = { active: true, queue: buildTestQueue(), index: 0, correct: 0, wrong: 0 };
-      updateTestButton();
-      showTestQuestion();
-    }
-
-    function stopTestMode() {
-      if (!state.testMode.active) return;
-      state.testMode.active = false;
-      updateTestButton();
-      cmdInput.placeholder = "/init, /plan, /status …";
-      beginView(null);
-      printResult("Тест зупинено", `<span class="line-ok">✓ ${state.testMode.correct}</span> · <span class="line-err">✗ ${state.testMode.wrong}</span>`, "warn");
-      flushView("claude&gt; · тест зупинено");
-    }
-
-    function finishTestMode() {
-      const tm = state.testMode;
-      const total = tm.queue.length;
-      const pct = total ? Math.round((tm.correct / total) * 100) : 0;
-      tm.active = false;
-      updateTestButton();
-      cmdInput.placeholder = "/init, /plan, /status …";
-      beginView(null);
-      printResult("Тест завершено!", `
-        <span class="line-ok">✓ ${tm.correct} / ${total}</span> · <span class="line-err">✗ ${tm.wrong}</span><br>
-        <span class="line-hl">Результат: ${pct}%</span>
-      `, pct >= 70 ? "ok" : "warn");
-      flushView(`claude&gt; · тест ${pct}%`);
-    }
-
-    function handleTestAnswer(raw) {
-      const cmd = raw.trim();
-      if (!cmd) return;
-      const tm = state.testMode;
-      const q = tm.queue[tm.index];
-      beginView(cmd);
-      const expected = q.cmd.toLowerCase();
-      const got = normalizeCmd(cmd).toLowerCase();
-      const aliasOk = ALIASES[cmd.split(/\s+/)[0].toLowerCase()] === q.cmd;
-      if (got === expected || cmd.toLowerCase() === expected || aliasOk) {
-        tm.correct++;
-        printResult("Правильно!", `<span class="line-ok">✓ ${esc(q.cmd)}</span>`, "ok");
-        tm.index++;
-        setTimeout(showTestQuestion, 400);
-      } else {
-        tm.wrong++;
-        printResult("Неправильно", `
-          <span class="line-err">✗ ${esc(cmd)}</span><br>
-          <span class="line-ok">Правильно: ${esc(q.cmd)}</span>
-        `, "warn");
-      }
-      flushView(`test&gt; · ${tm.correct}/${tm.queue.length}`);
-    }
-
-    function getCompletions() {
-      const vals = [];
-      for (const mod of Object.values(MODULES)) vals.push(...mod.commands);
-      return [...new Set([...vals, "/", "/help"])];
-    }
-
-    document.getElementById("cmdForm").addEventListener("submit", e => {
-      e.preventDefault();
-      execute(cmdInput.value);
-      cmdInput.value = "";
-    });
-
-    cmdInput.addEventListener("keydown", e => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        if (state.history.length) {
-          state.histIdx = Math.max(0, state.histIdx - 1);
-          cmdInput.value = state.history[state.histIdx] || "";
-        }
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        if (state.histIdx < state.history.length - 1) {
-          state.histIdx++;
-          cmdInput.value = state.history[state.histIdx] || "";
-        } else { state.histIdx = state.history.length; cmdInput.value = ""; }
-      } else if (e.key === "Tab") {
-        e.preventDefault();
-        const val = cmdInput.value;
-        const match = getCompletions().find(c => c.startsWith(val) && c !== val);
-        if (match) cmdInput.value = match;
-      } else if (e.ctrlKey && e.key === "c") {
-        e.preventDefault();
-        beginView(null);
-        print(`<span class="line-muted">^C — interrupted</span>`);
-        print(ukHint(UK_HINTS["ctrl-c"]));
-        flushView("claude&gt; · interrupted");
-      }
-    });
-
-    document.getElementById("btnTest").addEventListener("click", () => {
-      state.testMode.active ? stopTestMode() : startTestMode();
-    });
-    document.getElementById("btnStart").addEventListener("click", () => {
-      if (state.testMode.active) stopTestMode();
-      Object.keys(state.triedByModule).forEach(k => state.triedByModule[k].clear());
-      state.currentModule = "essentials";
-      state.claudeMd = false;
-      state.compacted = false;
-      welcome();
-      buildChecklist();
-      cmdInput.focus();
-    });
-    document.getElementById("btnClear").addEventListener("click", () => { welcome(); buildChecklist(); });
-
-    welcome();
-    buildChecklist();
-  </script>
+  <script src="engine/icons.js"></script>
+  <script src="course-config.js"></script>
+  <!-- lessons: one <script src="lessons/mNN.js"></script> per module, then exam.js and cheatsheet.js -->
+  <script src="lessons/m01.js"></script>
+  <script src="lessons/m02.js"></script>
+  <script src="lessons/m03.js"></script>
+  <script src="lessons/m04.js"></script>
+  <script src="lessons/m05.js"></script>
+  <script src="lessons/m06.js"></script>
+  <script src="lessons/m07.js"></script>
+  <script src="lessons/exam.js"></script>
+  <script src="lessons/cheatsheet.js"></script>
+  <script src="engine/app.js"></script>
 </body>
 </html>

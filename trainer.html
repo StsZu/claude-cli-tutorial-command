@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Тренажер Claude Code — slash-команди</title>
+  <style>
+    :root {
+      --bg: #0f0e0d; --panel: #1a1816; --border: #3d3835; --text: #ece7e1;
+      --muted: #b0a79e; --green: #6fcf97; --cyan: #7ec8e3; --yellow: #e6c87a;
+      --accent: #e08463; --blue: #8cc4ff; --purple: #c4a7e7; --red: #f07178;
+      --prompt: #e08463;
+      --font: "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(1200px 600px at 15% -10%, #3d2a22 0%, var(--bg) 55%);
+      color: var(--text); font-family: Inter, system-ui, -apple-system, sans-serif;
+    }
+    .wrap { max-width: 1140px; margin: 0 auto; padding: 20px; }
+    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    .skip-link { position: absolute; left: -9999px; top: 8px; background: var(--panel); color: var(--cyan); padding: 8px 12px; border-radius: 8px; z-index: 200; }
+    .skip-link:focus { left: 8px; }
+    .top-nav { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .top-nav a { color: var(--muted); text-decoration: none; font-size: 0.88rem; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; }
+    .top-nav a:hover { color: var(--text); background: #252220; }
+    .top-nav a.active { color: var(--accent); border-color: var(--accent); }
+    body.embed .top-nav, body.embed header, body.embed .skip-link { display: none; }
+    body.embed .wrap { padding: 12px; }
+    header { margin-bottom: 16px; }
+    header h1 { font-size: 1.25rem; margin: 0 0 6px; font-weight: 600; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+    .layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; }
+    @media (max-width: 880px) { .layout { grid-template-columns: minmax(0, 1fr); } .sidebar { order: 2; } }
+    .sidebar, .terminal-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .sidebar { padding: 14px; font-size: 0.82rem; }
+    .sidebar h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+    .cmd-list { list-style: none; padding: 0; margin: 0 0 16px; max-height: 300px; overflow-y: auto; }
+    .cmd-list li { margin: 0; }
+    .cmd-btn { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--text); padding: 5px 8px; border-radius: 6px; cursor: pointer; font-family: var(--font); font-size: 0.76rem; }
+    .cmd-btn:hover { background: #252220; }
+    .cmd-btn code { color: var(--cyan); word-break: break-all; }
+    .cmd-list li.done .cmd-btn code { color: var(--green); }
+    .cmd-list li.done .cmd-btn::after { content: " ✓"; color: var(--green); }
+    .cmd-btn.risk-high code { color: var(--red); }
+    .progress { height: 6px; background: #252220; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+    .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--yellow)); width: 0%; transition: width 0.3s; }
+    .stats { color: var(--muted); font-size: 0.78rem; margin-bottom: 14px; }
+    .hint-box { background: #252220; border-radius: 8px; padding: 10px; color: var(--muted); line-height: 1.45; font-size: 0.78rem; }
+    .module-badge { display: inline-block; background: #252220; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; color: var(--accent); margin-bottom: 10px; font-family: var(--font); }
+    .module-nav { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .module-nav .btn { text-align: left; font-family: var(--font); font-size: 0.72rem; }
+    .module-nav .btn.active { border-color: var(--accent); color: var(--accent); }
+    .terminal-wrap { display: flex; flex-direction: column; min-height: 540px; align-self: start; }
+    .term-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); }
+    .dots { display: flex; gap: 6px; }
+    .dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .dots span:nth-child(1) { background: #ff5f57; }
+    .dots span:nth-child(2) { background: #febc2e; }
+    .dots span:nth-child(3) { background: #28c840; }
+    .term-title { flex: 1; text-align: center; font-family: var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .output { flex: 1; padding: 16px; min-height: 380px; max-height: 60vh; overflow-y: auto; font-family: var(--font); font-size: 0.84rem; line-height: 1.55; word-break: break-word; }
+    .output-status { color: var(--muted); font-size: 0.75rem; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .line-user { color: var(--prompt); }
+    .line-muted { color: var(--muted); }
+    .line-ok { color: var(--green); }
+    .line-warn { color: var(--yellow); }
+    .line-err { color: var(--red); }
+    .line-cmd { color: var(--cyan); }
+    .line-hl { color: var(--blue); }
+    .line-uk-hint { color: var(--yellow); font-size: 0.82rem; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(230, 200, 122, 0.25); line-height: 1.5; }
+    .result-box { margin: 8px 0 12px; padding: 12px 14px; border-radius: 8px; border: 1px solid #a85a3a; background: rgba(217, 119, 87, 0.1); border-left: 4px solid var(--accent); white-space: pre-wrap; }
+    .result-box.warn { border-color: var(--yellow); background: rgba(230, 200, 122, 0.08); border-left-color: var(--yellow); }
+    .result-box.purple { border-color: var(--purple); background: rgba(196, 167, 231, 0.1); border-left-color: var(--purple); }
+    .result-box.danger { border-color: var(--red); background: rgba(240, 113, 120, 0.1); border-left-color: var(--red); }
+    .result-title { color: var(--accent); font-weight: 600; margin-bottom: 8px; font-size: 0.82rem; white-space: normal; }
+    .result-box.warn .result-title { color: var(--yellow); }
+    .result-box.purple .result-title { color: var(--purple); }
+    .result-box.danger .result-title { color: var(--red); }
+    .input-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); background: #0f0e0d; }
+    .input-row:focus-within { box-shadow: inset 0 0 0 2px var(--cyan); }
+    .prompt-label { color: var(--prompt); font-family: var(--font); font-size: 0.9rem; white-space: nowrap; }
+    #cmdInput { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--font); font-size: 0.9rem; }
+    .btn { background: #252220; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.78rem; }
+    .btn:hover { background: #302c28; }
+    .btn-primary { border-color: var(--accent); color: var(--accent); }
+    .btn-test { background: rgba(230, 200, 122, 0.12); border-color: var(--yellow); color: var(--yellow); }
+    .btn-test.active { background: var(--yellow); color: #0f0e0d; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .test-question { color: var(--yellow); line-height: 1.6; margin-bottom: 10px; }
+    kbd { background: #252220; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-family: var(--font); font-size: 0.78rem; }
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px; max-width: 520px; width: 100%; max-height: 80vh; overflow-y: auto; }
+    .modal h3 { margin: 0 0 14px; font-size: 1rem; }
+    .scenario-item { display: block; width: 100%; text-align: left; background: transparent; color: var(--text); font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
+    .scenario-item:hover, .scenario-item.selected { border-color: var(--accent); background: #252220; }
+    .scenario-item small { color: var(--muted); display: block; margin-top: 4px; }
+    @media (prefers-reduced-motion: reduce) { .progress > div { transition: none; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#cmdInput">Перейти до поля вводу</a>
+  <div class="wrap">
+    <nav class="top-nav" aria-label="Навігація курсу">
+      <a href="index.html#/">← До курсу</a>
+      <a href="trainer.html" class="active" aria-current="page">Тренажер</a>
+      <a href="index.html#/cheatsheet">Шпаргалка</a>
+    </nav>
+    <header>
+      <h1>Тренажер Claude Code — slash-команди</h1>
+      <p>
+        Емуляція без API: вводь <kbd>/</kbd>-команди і команди запуску <code>claude</code>, проходь розділи, потім — режим тестування.
+        Команда зараховується лише в точному вигляді або як офіційний аліас (<code>/reset</code> = <code>/clear</code>).
+        <kbd>↑</kbd>/<kbd>↓</kbd> — історія, <kbd>Tab</kbd> — автодоповнення. Набір команд залежить від версії — звіряйся з <code>/help</code>.
+      </p>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="module-badge" id="moduleBadge">Перші кроки</div>
+        <h2>Прогрес розділу</h2>
+        <div class="progress"><div id="progressBar"></div></div>
+        <div class="stats" id="progressText">0 / 0</div>
+        <h2>Розділи</h2>
+        <div class="module-nav" id="moduleNav"></div>
+        <h2>Команди розділу</h2>
+        <ul class="cmd-list" id="cmdChecklist"></ul>
+        <div class="hint-box">
+          <strong>Завдання:</strong> виконай усі команди розділу. Клік по команді вставляє її в поле.<br><br>
+          <strong>Тест:</strong> опис → введи команду; можна пропустити.
+        </div>
+        <div class="actions">
+          <button class="btn btn-test" id="btnTest" type="button" aria-pressed="false">Режим тестування</button>
+          <button class="btn btn-test" id="btnSkip" type="button" hidden>Пропустити</button>
+          <button class="btn btn-primary" id="btnScenario" type="button" aria-haspopup="dialog">Обрати розділ</button>
+          <button class="btn" id="btnNewSession" type="button" title="Скинути стан емулятора: режим, модель, CLAUDE.md">Нова сесія</button>
+          <button class="btn" id="btnResetProgress" type="button">Скинути прогрес</button>
+        </div>
+      </aside>
+
+      <section class="terminal-wrap">
+        <div class="term-bar">
+          <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="term-title" id="termTitle">claude — ~/Projects/demo</div>
+        </div>
+        <div class="output" id="output" role="log" aria-live="polite" aria-label="Вивід Claude Code">
+          <div class="output-status" id="outputStatus">claude · slash-команди</div>
+          <div class="live-panel" id="livePanel"></div>
+        </div>
+        <form class="input-row" id="cmdForm" autocomplete="off">
+          <span class="prompt-label" id="promptLabel" aria-hidden="true">&gt;</span>
+          <label class="visually-hidden" for="cmdInput">Команда для Claude Code</label>
+          <input id="cmdInput" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="/help, /init, /plan, /context …" />
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="scenarioModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="scenarioTitle">
+      <h3 id="scenarioTitle">Обрати розділ</h3>
+      <div id="scenarioList"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="scenarioConfirm" type="button">Enter — перейти</button>
+        <button class="btn" id="scenarioCancel" type="button">Esc — скасувати</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* Тренажер Claude Code (емуляція без API).
+     Зарахування — лише повний збіг після нормалізації з пунктом чекліста або з його офіційним аліасом (див. matches).
+     Факти звірено з https://code.claude.com/docs/en/commands (стан 2026-09). */
+  "use strict";
+  const STORAGE_KEY = "cli-claude-code-v1-trainer";
+
+  // [команда, опис українською, ризик?]
+  const MODULE_LIST = [
+    { id: "start", title: "Перші кроки", intro: "Запуск, довідка, CLAUDE.md, діагностика.", commands: [
+      ["claude", "Запустити інтерактивну сесію в поточній папці"],
+      ["/help", "Довідка і список доступних команд"],
+      ["/init", "Створити чернетку CLAUDE.md для проєкту"],
+      ["/memory", "Редагувати файли CLAUDE.md і керувати auto memory"],
+      ["/status", "Версія, модель, акаунт і стан з'єднання"],
+      ["/doctor", "Діагностика встановлення й налаштувань"],
+      ["claude -c", "Продовжити останню розмову в цій папці"],
+      ["/exit", "Завершити сесію"]
+    ] },
+    { id: "safety", title: "Безпека і дозволи", intro: "Режими дозволів, правила allow/ask/deny, пісочниця, небезпечний прапорець.", commands: [
+      ["claude --permission-mode plan", "Почати сесію в режимі планування"],
+      ["claude --permission-mode acceptEdits", "Почати сесію, в якій правки файлів не потребують підтвердження"],
+      ["/plan", "Увійти в режим планування з рядка вводу"],
+      ["/plan fix the auth bug", "Увійти в режим планування і одразу дати завдання fix the auth bug"],
+      ["/permissions", "Правила allow / ask / deny для інструментів"],
+      ["/sandbox", "Увімкнути або налаштувати пісочницю для команд оболонки"],
+      ["/fewer-permission-prompts", "Запропонувати allowlist частих read-only команд"],
+      ["claude --dangerously-skip-permissions", "Запуск без жодних запитів і перевірок (bypassPermissions) — лише контейнер чи VM", "high"]
+    ] },
+    { id: "context", title: "Контекст і сесії", intro: "context, compact, clear, resume, rewind.", commands: [
+      ["/context", "Показати, що займає вікно контексту"],
+      ["/compact", "Стиснути розмову в підсумок"],
+      ["/compact keep the API decisions", "Стиснути розмову, зберігши в підсумку рішення щодо API"],
+      ["/clear", "Почати нову розмову з порожнім контекстом"],
+      ["/btw", "Побічне запитання без запису в розмову"],
+      ["/resume", "Повернутися до попередньої сесії"],
+      ["/rename", "Перейменувати поточну сесію"],
+      ["/branch", "Відгалуження розмови для альтернативного підходу"],
+      ["/rewind", "Відкотити код і/або розмову до чекпоінту"],
+      ["/export", "Експортувати розмову як текст"],
+      ["/copy", "Скопіювати останню відповідь у буфер"]
+    ] },
+    { id: "code", title: "Код і review", intro: "diff, code-review, security-review, simplify, verify.", commands: [
+      ["/diff", "Переглянути зміни в робочій копії"],
+      ["/code-review", "Review поточних змін на баги"],
+      ["/code-review high", "Review змін на баги з рівнем глибини high"],
+      ["/code-review --fix", "Review з автоматичним застосуванням виправлень"],
+      ["/code-review ultra", "Глибокий багатоагентний review у хмарі"],
+      ["/security-review", "Пошук вразливостей у змінах гілки"],
+      ["/simplify", "Прибрати повтори й зайву складність у зміненому коді"],
+      ["/verify", "Зібрати, запустити застосунок і перевірити зміну"],
+      ["/run", "Запустити застосунок і подивитися зміну в роботі"],
+      ["/run-skill-generator", "Навчити /run і /verify запускати саме цей проєкт"]
+    ] },
+    { id: "model", title: "Модель і налаштування", intro: "model, effort, usage, config, theme.", commands: [
+      ["/model", "Відкрити вибір моделі"],
+      ["/model sonnet", "Перемкнутися на аліас sonnet без меню"],
+      ["/effort", "Показати або змінити рівень зусиль"],
+      ["/effort high", "Встановити рівень зусиль high"],
+      ["/fast", "Увімкнути або вимкнути швидкий режим"],
+      ["/usage", "Витрати сесії й ліміти плану"],
+      ["/config", "Відкрити налаштування"],
+      ["/theme", "Змінити колірну тему"],
+      ["/color", "Змінити колір рядка вводу для цієї сесії"],
+      ["/statusline", "Налаштувати рядок стану"],
+      ["/terminal-setup", "Налаштувати клавіші для нового рядка у вводі"],
+      ["/keybindings", "Відкрити файл клавіатурних скорочень"],
+      ["/tui", "Показати або змінити рендерер інтерфейсу"],
+      ["/focus", "Увімкнути focus view (лише в fullscreen)"],
+      ["/scroll-speed", "Швидкість прокрутки мишею (fullscreen)"],
+      ["/voice", "Голосовий ввід (диктування)"]
+    ] },
+    { id: "ext", title: "MCP, skills, розширення", intro: "mcp, skills, agents, hooks, plugins, інтеграції.", commands: [
+      ["/mcp", "Стан MCP-серверів і вхід через OAuth"],
+      ["/mcp reconnect github", "Перепідключити MCP-сервер github"],
+      ["/skills", "Список доступних skills"],
+      ["/reload-skills", "Підхопити нові чи змінені skills без перезапуску"],
+      ["/agents", "Субагенти"],
+      ["/hooks", "Переглянути налаштовані hooks"],
+      ["/plugin", "Керувати plugins"],
+      ["/reload-plugins", "Застосувати зміни plugins без перезапуску"],
+      ["/add-dir", "Додати ще одну робочу папку в сесію"],
+      ["/cd", "Перенести сесію в іншу робочу папку"],
+      ["/ide", "Інтеграції з IDE і їхній стан"],
+      ["/chrome", "Налаштування Claude in Chrome"],
+      ["/install-github-app", "Встановити Claude GitHub App для репозиторію"],
+      ["/install-slack-app", "Встановити Claude Slack app"],
+      ["/claude-api", "Довідкові матеріали Claude API для роботи з кодом"]
+    ] },
+    { id: "agents", title: "Фон і хмара", intro: "background, fork, tasks, batch, loop, schedule, teleport.", commands: [
+      ["/background", "Від'єднати сесію у фон і звільнити термінал"],
+      ["/fork", "Скопіювати розмову в нову фонову сесію"],
+      ["/tasks", "Фонова робота поточної сесії"],
+      ["/stop", "Зупинити фонову сесію, до якої ти підключений"],
+      ["/loop", "Повторювати промпт, поки сесія відкрита"],
+      ["/batch", "Велика зміна паралельними агентами в окремих worktree"],
+      ["/goal", "Працювати, доки не виконано умову"],
+      ["/schedule", "Хмарні routines за розкладом"],
+      ["/teleport", "Підтягнути хмарну сесію в термінал"],
+      ["/remote-control", "Керувати локальною сесією з claude.ai"],
+      ["/desktop", "Продовжити сесію в застосунку Claude Code Desktop"],
+      ["/remote-env", "Типове хмарне середовище для хмарних сесій"],
+      ["/web-setup", "Підключити GitHub для хмарних сесій"],
+      ["/autofix-pr", "Хмарна сесія, що виправляє PR після CI і коментарів"],
+      ["/deep-research", "Глибоке дослідження з джерелами"],
+      ["/workflows", "Перегляд запущених workflows"],
+      ["/advisor", "Друга модель-порадник для складних моментів"]
+    ] },
+    { id: "extra", title: "Акаунт і інше", intro: "Вхід, план, відгуки, діагностика, рідкісні команди.", commands: [
+      ["/login", "Увійти в акаунт Anthropic"],
+      ["/logout", "Вийти з акаунта Anthropic"],
+      ["/upgrade", "Сторінка переходу на вищий план"],
+      ["/usage-credits", "Налаштувати кредити використання після ліміту"],
+      ["/privacy-settings", "Налаштування приватності (Pro і Max)"],
+      ["/feedback", "Надіслати відгук про Claude Code"],
+      ["/bug", "Повідомити про помилку"],
+      ["/release-notes", "Що змінилося у версіях"],
+      ["/insights", "HTML-звіт про твої сесії"],
+      ["/recap", "Однорядковий підсумок поточної сесії"],
+      ["/team-onboarding", "Посібник для нового колеги з історії використання"],
+      ["/debug", "Увімкнути журнал налагодження сесії"],
+      ["/heapdump", "Знімок пам'яті для діагностики"],
+      ["/powerup", "Інтерактивні уроки функцій Claude Code"],
+      ["/mobile", "QR-код для завантаження мобільного застосунку"],
+      ["/setup-bedrock", "Майстер налаштування Amazon Bedrock"],
+      ["/setup-vertex", "Майстер налаштування Google Vertex AI"],
+      ["/design-login", "Авторизація доступу до design system для /design-sync"],
+      ["/design-sync", "Завантажити design system репозиторію в Claude Design"],
+      ["/passes", "Поділитися гостьовим тижнем Claude Code (якщо доступно)"],
+      ["/radio", "Lo-fi радіо Claude FM у браузері"],
+      ["/stickers", "Замовити наліпки Claude Code"]
+    ] }
+  ];
+
+  // Офіційні аліаси й еквівалентні форми: пункт чекліста → варіанти, що теж зараховуються.
+  const ALIASES = {
+    "claude -c": ["claude --continue"],
+    "claude --permission-mode plan": ["claude --permission-mode=plan"],
+    "claude --permission-mode acceptEdits": ["claude --permission-mode=acceptEdits"],
+    "claude --dangerously-skip-permissions": ["claude --permission-mode bypassPermissions", "claude --permission-mode=bypassPermissions"],
+    "/exit": ["/quit"],
+    "/doctor": ["/checkup"],
+    "/permissions": ["/allowed-tools"],
+    "/clear": ["/reset", "/new"],
+    "/resume": ["/continue"],
+    "/rewind": ["/checkpoint", "/undo"],
+    "/code-review": ["/review"],
+    "/code-review high": ["/review high"],
+    "/code-review --fix": ["/review --fix"],
+    "/code-review ultra": ["/ultrareview", "/review ultra"],
+    "/usage": ["/cost", "/stats"],
+    "/config": ["/settings"],
+    "/tasks": ["/bashes"],
+    "/background": ["/bg"],
+    "/loop": ["/proactive"],
+    "/schedule": ["/routines"],
+    "/teleport": ["/tp"],
+    "/remote-control": ["/rc"],
+    "/desktop": ["/app"],
+    "/bug": ["/share"],
+    "/mobile": ["/ios", "/android"]
+  };
+
+  // Видалені команди — пояснюємо, але не зараховуємо.
+  const REMOVED = {
+    "/vim": "Видалено у v2.1.92. Vim-режим поля вводу: /config → Editor mode.",
+    "/pr-comments": "Видалено у v2.1.91. Попроси Claude показати коментарі PR напряму (потрібен gh).",
+    "/ultraplan": "Видалено. Використовуй режим планування: /plan або Shift+Tab."
+  };
+
+  const MODULES = {};
+  const HINTS = {};
+  const RISK = {};
+  MODULE_LIST.forEach(m => {
+    MODULES[m.id] = { id: m.id, title: m.title, intro: m.intro, commands: m.commands.map(c => c[0]) };
+    m.commands.forEach(c => { HINTS[c[0]] = c[1]; if (c[2]) RISK[c[0]] = c[2]; });
+  });
+
+  /* ---------- строгий матчинг ---------- */
+  function normalizeCommand(s) {
+    return String(s || "").replace(/[“”„«»]/g, "\"").replace(/[‘’ʼ]/g, "'").replace(/\s+/g, " ").trim();
+  }
+  function matches(input, listed) {
+    const a = normalizeCommand(input);
+    if (!a) return false;
+    if (a === normalizeCommand(listed)) return true;
+    return (ALIASES[listed] || []).some(x => normalizeCommand(x) === a);
+  }
+  function allCommands() {
+    const seen = new Set(), out = [];
+    MODULE_LIST.forEach(m => m.commands.forEach(c => { if (!seen.has(c[0])) { seen.add(c[0]); out.push(c[0]); } }));
+    return out;
+  }
+  window.TRAINER = { commands: allCommands, matches: matches };
+
+  // Базові slash-команди, які емулятор знає (для виводу; зарахування — лише через matches).
+  const ALIAS_BASE = {};
+  Object.keys(ALIASES).forEach(k => {
+    if (!k.startsWith("/")) return;
+    const target = k.split(" ")[0];
+    ALIASES[k].forEach(a => { const b = a.split(" ")[0]; if (b !== target) ALIAS_BASE[b] = target; });
+  });
+  const KNOWN_SLASH = new Set();
+  allCommands().forEach(c => { if (c.startsWith("/")) KNOWN_SLASH.add(c.split(" ")[0]); });
+  Object.keys(ALIAS_BASE).forEach(b => KNOWN_SLASH.add(b));
+
+  /* ---------- стан ---------- */
+  const MODE_LABEL = {
+    default: "⏸ manual mode on", acceptEdits: "⏵⏵ accept edits on", plan: "⏸ plan mode on",
+    auto: "⏵⏵ auto mode on", bypassPermissions: "⏵⏵ bypass permissions on", dontAsk: "⏵⏵ don't ask on"
+  };
+  const state = {
+    currentModule: "start",
+    mode: "default", model: "sonnet", effort: "auto", claudeMd: false, sandbox: false,
+    history: [], histIdx: 0,
+    triedByModule: Object.fromEntries(Object.keys(MODULES).map(k => [k, new Set()])),
+    testMode: { active: false, queue: [], index: 0, correct: 0, wrong: 0, answered: false },
+    selectedModule: "start"
+  };
+
+  function saveProgress() {
+    try {
+      const tried = {};
+      Object.keys(state.triedByModule).forEach(k => { tried[k] = [...state.triedByModule[k]]; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, module: state.currentModule, tried }));
+    } catch (e) { /* сховище недоступне — прогрес лише в цій сесії */ }
+  }
+  function loadProgress() {
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch (e) { data = null; }
+    if (!data || typeof data !== "object") return;
+    if (data.tried && typeof data.tried === "object") {
+      Object.keys(MODULES).forEach(k => {
+        const list = Array.isArray(data.tried[k]) ? data.tried[k] : [];
+        list.forEach(c => { if (MODULES[k].commands.includes(c)) state.triedByModule[k].add(c); });
+      });
+    }
+    if (data.module && MODULES[data.module]) state.currentModule = data.module;
+  }
+
+  const $ = id => document.getElementById(id);
+  const livePanel = $("livePanel"), outputStatus = $("outputStatus"), cmdInput = $("cmdInput");
+  let viewChunks = [];
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function getModule() { return MODULES[state.currentModule] || MODULES.start; }
+  function getCurrentCommands() { return getModule().commands; }
+  function getTried() { return state.triedByModule[state.currentModule]; }
+
+  function beginView(cmd) {
+    viewChunks = [];
+    if (cmd != null) viewChunks.push(`<div class="line-user">&gt; ${esc(cmd)}</div>`);
+  }
+  function print(html, cls) { viewChunks.push(`<div class="${cls || "line-muted"}">${html}</div>`); }
+  function printResult(title, body, type, hint) {
+    const cls = type === "warn" ? "result-box warn" : type === "purple" ? "result-box purple" : type === "danger" ? "result-box danger" : "result-box";
+    viewChunks.push(`<div class="${cls}"><div class="result-title">${esc(title)}</div>${body}${hint ? `<div class="line-uk-hint">${esc(hint)}</div>` : ""}</div>`);
+  }
+  function flushView(status) {
+    livePanel.innerHTML = viewChunks.join("");
+    $("output").scrollTop = 0;
+    outputStatus.textContent = status || `claude · ${MODE_LABEL[state.mode]} · ${state.model}`;
+  }
+
+  /* ---------- емуляція ---------- */
+  function ok(s) { return `<span class="line-ok">${esc(s)}</span>`; }
+  function mu(s) { return `<span class="line-muted">${esc(s)}</span>`; }
+  function hl(s) { return `<span class="line-hl">${esc(s)}</span>`; }
+  function lines() { return Array.prototype.slice.call(arguments).join("\n"); }
+
+  const OUT = {
+    "/help": () => lines(hl("Claude Code — help"), mu("Type / to see available commands. Розділ тренажера: " + getModule().title),
+      ...getCurrentCommands().filter(c => c.startsWith("/")).map(c => `  <span class="line-cmd">${esc(c.padEnd(28))}</span>${mu(HINTS[c] || "")}`)),
+    "/init": () => { state.claudeMd = true; return lines(mu("Analyzing project structure…"), ok("✓ Created CLAUDE.md"), mu("  - Build: npm run build"), mu("  - Test:  npm test"), mu("Перечитай чернетку перед комітом.")); },
+    "/memory": () => lines(hl("Memory files"), `  › Project  ./CLAUDE.md ${state.claudeMd ? "" : "(missing — /init)"}`, "    User     ~/.claude/CLAUDE.md", mu("  Auto memory: on")),
+    "/status": () => lines(hl("Status"), `  Version   2.1.x (емуляція)`, `  Model     ${esc(state.model)}`, `  Mode      ${esc(state.mode)}`, `  CLAUDE.md ${state.claudeMd ? "present" : "missing"}`),
+    "/doctor": () => lines(mu("Running checkup…"), ok("✓ Installation healthy"), ok("✓ Settings files valid"), mu("  2 unused MCP servers — consider /mcp disable")),
+    "/exit": () => lines(ok("Bye! Сесію збережено — поверне claude -c або /resume."), mu("(у тренажері сесія лишається відкритою)")),
+    "/plan": (arg) => { state.mode = "plan"; return lines(ok(MODE_LABEL.plan), arg ? mu("Task: " + arg) : mu("Claude досліджує і пропонує план; правки — після схвалення."), mu("Exploring… (read-only)")); },
+    "/permissions": () => lines(hl("Permissions"), "  Allow  Ask  Deny  Workspace", "  › Add a new rule…", mu("  приклад deny: Read(./.env)")),
+    "/sandbox": () => { state.sandbox = true; return lines(hl("Sandbox"), "  Mode: › auto-allow   regular permissions", mu("Команди оболонки обмежено проєктом; deny і ask діють і далі.")); },
+    "/fewer-permission-prompts": () => lines(mu("Scanning transcripts…"), "  Proposed allowlist (.claude/settings.json):", "    Bash(git status)", "    Bash(npm test)", mu("Перечитай список, перш ніж погодитись.")),
+    "/context": () => lines(hl("Context usage  ████████░░  78%"), "  Messages       52%", "  Tool results   18%", "  Memory files    8%", mu("Порада: /compact або /clear для нової задачі.")),
+    "/compact": (arg) => lines(ok("✓ Conversation compacted"), arg ? mu("Summary focus: " + arg) : mu("Summary kept: decisions, open TODOs")),
+    "/clear": () => lines(ok("✓ New conversation — context cleared"), mu("Попередня розмова доступна в /resume.")),
+    "/btw": (arg) => arg ? lines(mu("side question: " + arg), mu("(відповідь не додається в розмову)")) : mu("Usage: /btw <question> — або перегляд попередніх побічних запитань"),
+    "/resume": () => lines(hl("Resume session"), "  › auth-refactor        yesterday · 42 msgs", "    landing-page         3 days ago", mu("Enter — відкрити")),
+    "/rename": (arg) => ok(`✓ Session renamed: ${arg || "fix-login-validation (auto)"}`),
+    "/branch": () => lines(ok("✓ Branched conversation"), mu("Оригінал — у /resume")),
+    "/rewind": () => lines(hl("Rewind to:"), "  › \"fix the login bug\"   2 files changed", "    \"add tests\"", mu("Restore code and conversation / conversation / code"), mu("Зміни від команд оболонки (rm, mv) не відстежуються — для них Git.")),
+    "/export": (arg) => ok(arg ? `✓ Exported to ${arg}` : "Export: › Copy to clipboard   Save to file"),
+    "/copy": () => ok("✓ Copied last response to clipboard"),
+    "/diff": () => lines(" src/auth.js      | 12 ++++++----", " tests/auth.test  |  8 ++++++++", mu(" 2 files changed")),
+    "/code-review": (arg) => {
+      if (/ultra/.test(arg)) return lines(ok("Launching cloud review (ultra)…"), mu("Кількість безкоштовних запусків обмежена; далі — кредити використання."));
+      if (/--fix/.test(arg)) return lines(mu("Reviewing 2 changed files…"), ok("✓ Applied 1 fix: src/auth.js:42"), mu("Переглянь /diff перед комітом."));
+      return lines(mu(`Reviewing 2 changed files${arg ? " (" + arg + ")" : ""}…`), `<span class="line-warn">  ⚠ src/auth.js:42  token expiry compared as string</span>`, mu("  1 finding"));
+    },
+    "/security-review": () => lines(mu("Comparing with origin/main…"), `<span class="line-warn">  ⚠ src/db.js:17  SQL built by string concatenation</span>`, mu("  1 potential vulnerability")),
+    "/simplify": () => lines(mu("Running 4 review agents…"), ok("✓ Removed duplicated helper in utils/date.js")),
+    "/verify": () => lines(mu("Building… running app… opening /login"), ok("✓ Login form submits and redirects to /dashboard")),
+    "/run": () => lines(mu("Starting dev server on :3000…"), ok("✓ App running")),
+    "/model": (arg) => { if (arg) { state.model = arg; return ok(`✓ Set model to ${arg}`); } return lines(hl("Select model"), `  › ${esc(state.model)} (current)`, "    opus", "    haiku", "    fable (якщо доступна)", mu("Аліаси вказують на актуальні версії; s — лише для цієї сесії.")); },
+    "/effort": (arg) => { if (arg) { state.effort = arg; return ok(`✓ Effort level set to ${arg}`); } return lines(hl(`Effort: ${state.effort}`), mu("low · medium · high · xhigh · max · auto (залежить від моделі)")); },
+    "/usage": () => lines(hl("Usage"), "  Session       $0.42 (емуляція)", "  Plan limit    37% used · resets in 3h", mu("  Tabs: Usage · Stats")),
+    "/config": () => lines(hl("Settings"), "  Status  Config  Usage", "  › Editor mode   normal", "    Theme         auto", "    Model         " + esc(state.model)),
+    "/mcp": (arg) => {
+      if (/^reconnect\s+\S+/.test(arg)) return ok(`Reconnecting ${arg.split(/\s+/)[1]}… ✓ connected (14 tools)`);
+      return lines(hl("MCP servers"), ok("  ✓ filesystem   connected"), `<span class="line-err">  ✗ github       failed — reconnect</span>`);
+    },
+    "/skills": () => lines(hl("Skills (12)"), "  code-review   bundled", "  verify        bundled", "  deploy-check  project"),
+    "/reload-skills": () => ok("✓ Reloaded skills: 12 available (1 added)"),
+    "/background": () => lines(ok("✓ Session detached — running in background"), mu("Monitor: claude agents")),
+    "/fork": (arg) => lines(ok("✓ Forked into background session"), arg ? mu("Task: " + arg) : mu("Чекає першого промпту в agent view")),
+    "/tasks": () => lines(hl("Background tasks"), "  ● npm run test:watch      running  4m", "  ✓ subagent: audit deps   done"),
+    "/stop": () => mu("Лише в підключеній фоновій сесії: зупиняє її, історія й worktree лишаються.")
+  };
+
+  function emulateSlash(cmd) {
+    const base = cmd.split(" ")[0];
+    const arg = base === "/ultrareview" ? ("ultra " + cmd.slice(base.length)).trim() : cmd.slice(base.length).trim();
+    if (REMOVED[base]) {
+      printResult(`${base} — видалена команда`, mu(REMOVED[base]), "warn");
+      return false;
+    }
+    if (!KNOWN_SLASH.has(base)) {
+      printResult("Невідома команда", mu(`«${cmd}» — такої команди немає в тренажері. Набери / або /help, щоб побачити список розділу.`), "warn");
+      return false;
+    }
+    const target = ALIAS_BASE[base] || base;
+    const listedExact = allCommands().find(c => matches(cmd, c));
+    const hint = HINTS[listedExact] || HINTS[target] || "";
+    const fn = OUT[target];
+    const body = fn ? fn(arg) : lines(ok("✓ " + (HINTS[target] || target)), mu("Емуляція: реальний вивід залежить від версії Claude Code."));
+    const aliasNote = target !== base ? `\n${mu(base + " — аліас " + target)}` : "";
+    printResult(cmd, body + aliasNote, "ok", hint);
+    return true;
+  }
+
+  function emulateClaude(cmd) {
+    const flags = cmd.replace(/^claude\s*/, "");
+    const pm = flags.match(/^--permission-mode(?:=|\s+)(\S+)$/);
+    if (flags === "") {
+      printResult("claude", lines(ok("Claude Code — нова сесія в ~/Projects/demo"), mu(MODE_LABEL[state.mode] + " (shift+tab to cycle)")), "ok", HINTS.claude);
+      return true;
+    }
+    if (flags === "-c" || flags === "--continue") {
+      printResult(cmd, ok("Resuming conversation \"auth-refactor\" (yesterday, 42 messages)"), "ok", HINTS["claude -c"]);
+      return true;
+    }
+    if (flags === "--dangerously-skip-permissions" || (pm && pm[1] === "bypassPermissions")) {
+      state.mode = "bypassPermissions";
+      printResult("⚠ bypassPermissions — без запитів і перевірок", lines(
+        `<span class="line-err">${esc(MODE_LABEL.bypassPermissions)}</span>`,
+        "Агент виконає rm -rf, git push --force, зміни конфігів одразу, без питань.",
+        "Зміни від команд оболонки /rewind не відкотить. Під root/sudo Claude Code відмовиться стартувати.",
+        ok("Безпечніше: acceptEdits або auto для роботи, dontAsk з allowlist для скриптів."),
+        ok("Повна автономія — лише в контейнері, VM чи dev container без твоїх ключів і даних.")), "danger", HINTS["claude --dangerously-skip-permissions"]);
+      return true;
+    }
+    if (pm) {
+      const mode = pm[1] === "manual" ? "default" : pm[1];
+      if (!MODE_LABEL[mode]) { printResult("Невідомий режим", mu(`«${pm[1]}». Доступні: default (manual), acceptEdits, plan, auto, dontAsk, bypassPermissions.`), "warn"); return false; }
+      state.mode = mode;
+      printResult(cmd, lines(ok(MODE_LABEL[mode]), mu("(shift+tab to cycle)")), "ok", HINTS[cmd] || "");
+      return true;
+    }
+    printResult("Невідомий запуск", mu(`«${cmd}» не емулюється. Спробуй claude, claude -c або claude --permission-mode plan.`), "warn");
+    return false;
+  }
+
+  function handleCommand(cmd) {
+    if (cmd === "/") {
+      printResult("Меню команд", OUT["/help"](), "purple", "Набирай літери після /, щоб відфільтрувати список.");
+      return false;
+    }
+    if (cmd.startsWith("/")) return emulateSlash(cmd);
+    if (/^claude(\s|$)/.test(cmd)) return emulateClaude(cmd);
+    if (cmd.startsWith("!")) {
+      printResult("Режим оболонки (!)", lines(mu(`$ ${cmd.slice(1).trim()}`), mu("Команда виконалась би в оболонці, а вивід потрапив би в розмову. Тренажер оболонку не емулює.")), "purple");
+      return false;
+    }
+    printResult("Промпт", lines(ok(`«${cmd}»`), mu("Відповідь моделі не емулюється — тренуй slash-команди і запуск claude.")), "purple");
+    return false;
+  }
+
+  function execute(raw) {
+    const cmd = normalizeCommand(raw);
+    if (!cmd) return;
+    if (state.testMode.active) { handleTestAnswer(cmd); return; }
+    state.history.push(cmd);
+    state.histIdx = state.history.length;
+    beginView(cmd);
+    const listed = getCurrentCommands().find(c => matches(cmd, c));
+    if (!listed) {
+      const owner = MODULE_LIST.find(m => m.commands.some(c => matches(cmd, c[0])));
+      if (owner && owner.id !== state.currentModule) print(`<span class="line-warn">Ця команда — з розділу «${esc(owner.title)}». Тут вона не зараховується.</span>`);
+    }
+    const res = handleCommand(cmd);
+    flushView();
+    if (res !== false && listed) markTried(listed);
+  }
+
+  function markTried(listed) {
+    getTried().add(listed);
+    saveProgress();
+    updateProgress();
+    updateModuleNav();
+  }
+
+  /* ---------- UI ---------- */
+  function updateProgress() {
+    const cmds = getCurrentCommands(), n = getTried().size;
+    $("moduleBadge").textContent = getModule().title;
+    $("progressBar").style.width = cmds.length ? `${(n / cmds.length) * 100}%` : "0%";
+    $("progressText").textContent = `${n} / ${cmds.length} команд`;
+    $("cmdChecklist").querySelectorAll("li").forEach(li => li.classList.toggle("done", getTried().has(li.dataset.cmd)));
+  }
+  function updateModuleNav() {
+    const nav = $("moduleNav");
+    nav.innerHTML = MODULE_LIST.map(m => {
+      const t = state.triedByModule[m.id].size, total = m.commands.length;
+      const act = m.id === state.currentModule;
+      return `<button type="button" class="btn${act ? " active" : ""}" data-module="${m.id}"${act ? ' aria-current="true"' : ""}>${esc(m.title)} · ${t}/${total} (${Math.round(t / total * 100)}%)</button>`;
+    }).join("");
+    nav.querySelectorAll("button").forEach(b => b.addEventListener("click", () => switchModule(b.dataset.module)));
+  }
+  function buildChecklist() {
+    const list = $("cmdChecklist");
+    list.innerHTML = getCurrentCommands().map(c =>
+      `<li data-cmd="${esc(c)}"><button type="button" class="cmd-btn${RISK[c] === "high" ? " risk-high" : ""}" title="${esc(HINTS[c] || "")}"><code>${esc(c)}</code></button></li>`).join("");
+    list.querySelectorAll("li").forEach(li => {
+      li.querySelector("button").addEventListener("click", () => { cmdInput.value = li.dataset.cmd; cmdInput.focus(); });
+    });
+    updateProgress();
+    updateModuleNav();
+  }
+  function switchModule(id) {
+    if (!MODULES[id]) return;
+    state.currentModule = id;
+    saveProgress();
+    buildChecklist();
+    beginView(null);
+    const m = getModule();
+    printResult(`Розділ: ${m.title}`, lines(mu(m.intro), hl(`Команд: ${m.commands.length}`)), "purple", "Список команд зліва оновився. Клік — вставити в поле вводу.");
+    flushView();
+  }
+  function welcome() {
+    beginView(null);
+    printResult("Тренажер Claude Code (емуляція без API)", lines(
+      "Почни з: <span class=\"line-cmd\">/help</span> · <span class=\"line-cmd\">/init</span> · <span class=\"line-cmd\">/plan</span> · <span class=\"line-cmd\">/permissions</span>",
+      "Далі: <span class=\"line-cmd\">/context</span> · <span class=\"line-cmd\">/diff</span> · <span class=\"line-cmd\">/code-review</span> · <span class=\"line-cmd\">/mcp</span> · <span class=\"line-cmd\">/effort</span>",
+      mu("Зараховується точна команда зі списку розділу або її офіційний аліас.")), "ok", "Промпт — завдання моделі, /команда — керування сесією.");
+    flushView();
+  }
+
+  /* ---------- тест-режим ---------- */
+  function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function buildTestQueue() { return shuffleArray(allCommands().filter(c => HINTS[c]).map(c => ({ cmd: c, hint: HINTS[c] }))); }
+  function updateTestButton() {
+    const btn = $("btnTest");
+    btn.textContent = state.testMode.active ? "Зупинити тест" : "Режим тестування";
+    btn.classList.toggle("active", state.testMode.active);
+    btn.setAttribute("aria-pressed", state.testMode.active ? "true" : "false");
+    $("btnSkip").hidden = !state.testMode.active;
+  }
+  function showTestQuestion() {
+    const tm = state.testMode, q = tm.queue[tm.index];
+    if (!q) { finishTestMode(); return; }
+    tm.answered = false;
+    beginView(null);
+    printResult(`Тест ${tm.index + 1}/${tm.queue.length}`, `<div class="test-question">Яка команда: <em>${esc(q.hint)}</em></div>${mu(`Введи команду і Enter або натисни «Пропустити». Правильно: ${tm.correct}, помилок: ${tm.wrong}`)}`, "purple");
+    flushView(`тест · ${tm.index + 1}/${tm.queue.length}`);
+  }
+  function startTestMode() {
+    state.testMode = { active: true, queue: buildTestQueue(), index: 0, correct: 0, wrong: 0, answered: false };
+    updateTestButton();
+    showTestQuestion();
+    cmdInput.focus();
+  }
+  function stopTestMode() { state.testMode.active = false; updateTestButton(); welcome(); }
+  function finishTestMode() {
+    const tm = state.testMode, total = tm.queue.length, pct = total ? Math.round(tm.correct / total * 100) : 0;
+    beginView(null);
+    printResult("Тест завершено", lines(ok(`Правильно: ${tm.correct} / ${total} (${pct}%)`), `<span class="line-warn">Помилок / пропущено: ${tm.wrong}</span>`), pct >= 70 ? "ok" : "warn");
+    flushView("тест завершено");
+    tm.active = false;
+    updateTestButton();
+  }
+  function nextTestQuestion() { state.testMode.index++; showTestQuestion(); }
+  function handleTestAnswer(cmd) {
+    const tm = state.testMode, q = tm.queue[tm.index];
+    if (!q || tm.answered) return;
+    tm.answered = true;
+    beginView(cmd);
+    if (matches(cmd, q.cmd)) {
+      tm.correct++;
+      printResult("✓ Правильно!", ok(q.cmd), "ok", q.hint);
+    } else {
+      tm.wrong++;
+      printResult("✗ Ні", `<span class="line-err">Очікувалось: ${esc(q.cmd)}${ALIASES[q.cmd] ? " (або " + esc(ALIASES[q.cmd].join(", ")) + ")" : ""}</span>`, "warn", q.hint);
+    }
+    flushView(`тест · ${tm.correct}✓ ${tm.wrong}✗`);
+    setTimeout(() => { if (state.testMode.active && state.testMode.queue[tm.index] === q) nextTestQuestion(); }, 1500);
+  }
+  function skipTestQuestion() {
+    const tm = state.testMode;
+    if (!tm.active) return;
+    const q = tm.queue[tm.index];
+    if (q && !tm.answered) {
+      tm.wrong++;
+      beginView(null);
+      printResult("Пропущено", `${mu("Відповідь: ")}<span class="line-cmd">${esc(q.cmd)}</span>`, "warn", q.hint);
+      flushView("тест · пропущено");
+    }
+    nextTestQuestion();
+    cmdInput.focus();
+  }
+
+  /* ---------- модалка розділів ---------- */
+  const modal = $("scenarioModal");
+  let lastFocus = null;
+  function openModal() {
+    const list = $("scenarioList");
+    state.selectedModule = state.currentModule;
+    list.innerHTML = MODULE_LIST.map(m => {
+      const sel = m.id === state.selectedModule;
+      return `<button type="button" class="scenario-item${sel ? " selected" : ""}" data-id="${m.id}" aria-pressed="${sel}"><strong>${esc(m.title)}</strong><small>${esc(m.intro)} · ${m.commands.length} команд</small></button>`;
+    }).join("");
+    list.querySelectorAll(".scenario-item").forEach(el => el.addEventListener("click", () => {
+      list.querySelectorAll(".scenario-item").forEach(x => { x.classList.remove("selected"); x.setAttribute("aria-pressed", "false"); });
+      el.classList.add("selected"); el.setAttribute("aria-pressed", "true");
+      state.selectedModule = el.dataset.id;
+    }));
+    lastFocus = document.activeElement;
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    (list.querySelector(".selected") || list.querySelector("button")).focus();
+  }
+  function closeModal() {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  function confirmModal() { switchModule(state.selectedModule); closeModal(); }
+
+  /* ---------- init ---------- */
+  if (/[?&]embed=1/.test(location.search)) document.body.classList.add("embed");
+
+  $("cmdForm").addEventListener("submit", e => { e.preventDefault(); execute(cmdInput.value); cmdInput.value = ""; });
+  cmdInput.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (state.histIdx > 0) { state.histIdx--; cmdInput.value = state.history[state.histIdx] || ""; }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (state.histIdx < state.history.length - 1) { state.histIdx++; cmdInput.value = state.history[state.histIdx] || ""; }
+      else { state.histIdx = state.history.length; cmdInput.value = ""; }
+    } else if (e.key === "Tab" && !e.shiftKey) {
+      // Автодоповнення лише коли є що доповнити; інакше Tab переводить фокус далі.
+      const val = cmdInput.value;
+      if (!val.trim()) return;
+      const match = getCurrentCommands().find(c => c.startsWith(val) && c !== val) || allCommands().find(c => c.startsWith(val) && c !== val);
+      if (match) { e.preventDefault(); cmdInput.value = match; }
+    }
+  });
+  $("btnTest").addEventListener("click", () => { state.testMode.active ? stopTestMode() : startTestMode(); });
+  $("btnSkip").addEventListener("click", skipTestQuestion);
+  $("btnScenario").addEventListener("click", openModal);
+  $("btnNewSession").addEventListener("click", () => {
+    Object.assign(state, { mode: "default", model: "sonnet", effort: "auto", claudeMd: false, sandbox: false });
+    if (state.testMode.active) stopTestMode(); else welcome();
+  });
+  $("btnResetProgress").addEventListener("click", () => {
+    if (!confirm("Скинути прогрес усіх розділів тренажера?")) return;
+    Object.keys(state.triedByModule).forEach(k => state.triedByModule[k].clear());
+    saveProgress(); buildChecklist();
+  });
+  $("scenarioConfirm").addEventListener("click", confirmModal);
+  $("scenarioCancel").addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+  modal.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+    if (e.key === "Enter" && e.target.id !== "scenarioCancel") {
+      e.preventDefault();
+      if (e.target.classList && e.target.classList.contains("scenario-item")) e.target.click();
+      confirmModal();
+      return;
+    }
+    if (e.key === "Tab") {
+      const f = [...modal.querySelectorAll("button")], first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  loadProgress();
+  buildChecklist();
+  welcome();
+  </script>
+</body>
+</html>

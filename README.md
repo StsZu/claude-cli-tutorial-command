@@ -1,48 +1,44 @@
-# Claude Code Slash Commands — Тренажер
+# Claude Code: slash-команди — курс і тренажер
 
-Інтерактивний HTML-тренажер slash-команд Claude Code українською.
+Курс українською про Claude Code CLI: slash-команди, режими дозволів, контекст і сесії, review коду, моделі, MCP/skills і фонові агенти. Статичні сторінки без API — працюють локально (`file://`) або на GitHub Pages.
 
-**Без API** — один статичний `index.html`, працює локально в браузері або на GitHub Pages.
+**Головна мета — не вивчити всі команди, а навчитися швидко знаходити потрібну команду, розуміти її ризик і застосовувати її в реальному сценарії.**
 
 ## Швидкий старт
 
 ```bash
 open index.html          # macOS
-# або подвійний клік на index.html
 ```
 
-Перегенерація після змін у `claude_code_slash_commands_uk.md`:
+## Що всередині
 
-```bash
-python3 scripts/build_index.py
-```
+| Файл | Опис |
+|------|------|
+| [index.html](index.html) | Курс: 7 модулів, 12 уроків, quiz, фінальний іспит, шпаргалка, словник. Генерується з `course-config.js` і `lessons/*.js` командою `node scripts/render-index.mjs courses/claude-code` у hub — не редагуй вручну |
+| [trainer.html](trainer.html) | Тренажер-емулятор slash-команд: 8 розділів, строгий матчинг з офіційними аліасами, тест-режим, прогрес у `localStorage` |
+| `course-config.js`, `lessons/` | Дані курсу (модулі, уроки, іспит, шпаргалка) |
+| `engine/` | Копія спільного рушія hub (`scripts/sync-engine.sh claude-code`), вручну не редагується |
+| [claude_code_slash_commands_uk.md](claude_code_slash_commands_uk.md) | Архів: довідник команд (стан 2026-06-30) |
 
-## Розділи навчання
+## Модулі
 
-| Розділ | Зміст |
-|--------|--------|
-| **Щоденний мінімум** | 80/20: `/init`, `/plan`, `/diff`, `/verify`… |
-| **Проєкт і налаштування** | memory, permissions, MCP, інтеграції |
-| **Сесія і контекст** | clear, compact, resume, rewind |
-| **Код і review** | code-review, security-review, simplify |
-| **Агенти і фон** | background, fork, batch, teleport |
-| **Модель і UI** | model, effort, theme, usage |
-| **Додаткові** | решта команд з довідника |
+1. Перші кроки — `claude`, `/`, `/help`, `/init`, `CLAUDE.md`
+2. Безпека: режими дозволів — `Shift+Tab`, `--permission-mode`, `/permissions`, `/sandbox`, ризик `--dangerously-skip-permissions`
+3. Контекст і сесії — `/context`, `/compact`, `/clear`, `/resume`, `/rewind`
+4. Код і review — `/diff`, `/code-review`, `/security-review`, `/simplify`, `/verify`
+5. Модель, зусилля і налаштування — `/model`, `/effort`, `/usage`, `/config`
+6. Розширення — `/mcp`, skills, `/agents`, `/hooks`, `/plugin`
+7. Фонові агенти і хмара — `/background`, `/fork`, `/tasks`, `/batch`, `/schedule`, `/teleport`
 
-## Можливості
+## Legacy
 
-- Емуляція slash-команд з українськими підказками
-- Прогрес по кожному розділу
-- **Режим тестування** — вгадай команду за описом
-- `↑`/`↓` історія, `Tab` автодоповнення
-- Підтримка аліасів (`/bg` → `/background`, `/new` → `/clear`…)
+`scripts/build_index.py` — старий генератор тренажера з `claude_code_slash_commands_uk.md`. Він **записує `index.html`** і перезапише оболонку курсу, тому не запускай його. Тренажер тепер підтримується вручну в `trainer.html`; довідник і скрипт лишаються як архів.
 
 ## Джерела
 
-- `claude_code_slash_commands_uk.md` — локальний довідник
 - https://code.claude.com/docs/en/commands
-- https://code.claude.com/docs/en/agent-sdk/slash-commands
+- https://code.claude.com/docs/en/permission-modes
+- https://code.claude.com/docs/en/checkpointing
+- https://code.claude.com/docs/en/cli-reference
 
-## GitHub Pages
-
-Settings → Pages → Deploy from branch → `main` → `/ (root)`.
+Набір команд залежить від версії, плану й платформи — звіряйся з `/help` своєї версії.
